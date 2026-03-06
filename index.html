@@ -91,19 +91,19 @@
     <!-- Config Panel -->
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
         <!-- Model -->
-        <div class="bg-card rounded-xl p-6 border border-gray-800">
+        <div class="bg-card rounded-xl p-6 border border-gray-800 lg:order-2">
             <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🧠 <span data-i18n="cfg.model">Model</span></h2>
             <select id="model-select" onchange="onModelChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-4 pr-8"></select>
             <div id="model-info" class="text-sm text-gray-500 space-y-1"></div>
         </div>
         <!-- Device -->
-        <div class="bg-card rounded-xl p-6 border border-gray-800">
+        <div class="bg-card rounded-xl p-6 border border-gray-800 lg:order-3">
             <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🖥️ <span data-i18n="cfg.device">Device</span></h2>
             <select id="device-select" onchange="onDeviceChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-4 pr-8"></select>
             <div id="device-info" class="text-sm text-gray-500 space-y-1"></div>
         </div>
         <!-- Quantization Parameters -->
-        <div class="bg-card rounded-xl p-6 border border-gray-800">
+        <div class="bg-card rounded-xl p-6 border border-gray-800 lg:order-4">
             <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🧮 <span data-i18n="cfg.quant">Quantization</span></h2>
             <div class="space-y-4">
                 <div>
@@ -129,7 +129,7 @@
         </div>
 
         <!-- Runtime Parameters -->
-        <div class="bg-card rounded-xl p-6 border border-gray-800">
+        <div class="bg-card rounded-xl p-6 border border-gray-800 lg:order-1">
             <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">⚙️ <span data-i18n="cfg.params">Parameters</span></h2>
             <div class="space-y-4">
                 <div>
