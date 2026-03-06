@@ -764,7 +764,7 @@ const I18N = {
         'mg.chart.efficiency': '扩展效率（%）',
         'mg.chart.ideal': '理想（线性扩展）',
         // 导航
-        'nav.overall': '总览',
+        'nav.overall': '首页',
         'nav.ops': '逐算子',
         'nav.robot': 'Bot 选型',
         // Bot 页面
