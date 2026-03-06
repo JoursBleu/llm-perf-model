@@ -592,17 +592,25 @@ function renderScaling(r) {
 
 function onModelChange() {
     const m = MODELS[document.getElementById('model-select').value];
-    const modelInfo = (typeof formatModelInfoLine === 'function')
-        ? formatModelInfoLine(m)
-        : `${(m.params/1e9).toFixed(1)}B${m.moe?` (active ${(m.activeParams/1e9).toFixed(1)}B)`:''} | ${m.layers}L | ${m.heads}H | ${m.hiddenDim}D${m.moe?` | MoE ${m.numExperts}×top${m.topK}`:''}`;
+    const isZh = getLang() === 'zh';
+    const modelInfo = `
+        <div>${isZh ? '架构' : 'Arch'}: ${m.arch} | ${isZh ? '参数' : 'Params'}: ${(m.params/1e9).toFixed(1)}B${m.moe ? ` (${isZh ? '激活' : 'active'} ${(m.activeParams/1e9).toFixed(1)}B)` : ''}</div>
+        <div>${isZh ? '层数' : 'Layers'}: ${m.layers} | ${isZh ? '头数' : 'Heads'}: ${m.heads} (KV: ${m.kvHeads}) | ${isZh ? '隐藏维' : 'Hidden'}: ${m.hiddenDim}</div>
+        <div>${isZh ? '上下文' : 'Context'}: ${(m.maxCtx / 1024).toFixed(0)}K${m.moe ? ` | MoE: ${m.numExperts}×top${m.topK}` : ''}</div>
+        ${m.note ? `<div class="text-yellow-500">${m.note}</div>` : ''}`;
     document.getElementById('model-info').innerHTML = modelInfo;
     calculate();
 }
 function onDeviceChange() {
     const d = DEVICES[document.getElementById('device-select').value];
-    const deviceInfo = (typeof formatDeviceInfoLine === 'function')
-        ? formatDeviceInfoLine(d)
-        : `${d.vram}GB | ${d.bw} GB/s | FP16: ${d.fp16Tflops}T`;
+    const isZh = getLang() === 'zh';
+    const linkText = d.interconnectBW > 0
+        ? `${d.interconnectBW} GB/s · ${isZh ? '最大' : 'max'} ${d.maxGPUs} GPU`
+        : (isZh ? '单设备' : 'single device');
+    const deviceInfo = `
+        <div>${isZh ? '厂商' : 'Vendor'}: ${d.vendor.toUpperCase()} | VRAM: ${d.vram} GB | BW: ${d.bw} GB/s</div>
+        <div>FP16: ${d.fp16Tflops}T | FP8: ${d.fp8Tflops}T | INT8: ${d.int8Tflops}T</div>
+        <div>${isZh ? '互联/扩展' : 'Interconnect/Scale'}: ${linkText}</div>`;
     document.getElementById('device-info').innerHTML = deviceInfo;
     calculate();
 }
