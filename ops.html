@@ -340,13 +340,12 @@ function renderOps() {
 
 function onModelChange() {
     const m = MODELS[document.getElementById('model-select').value];
-    document.getElementById('model-info').innerHTML =
-        `${(m.params/1e9).toFixed(1)}B${m.moe?` (active ${(m.activeParams/1e9).toFixed(1)}B)`:''} | ${m.layers}L | ${m.heads}H | ${m.hiddenDim}D${m.moe?` | MoE ${m.numExperts}×top${m.topK}`:''}`;
+    document.getElementById('model-info').innerHTML = formatModelInfoLine(m);
     renderOps();
 }
 function onDeviceChange() {
     const d = DEVICES[document.getElementById('device-select').value];
-    document.getElementById('device-info').innerHTML = `${d.vram}GB | ${d.bw} GB/s | FP16: ${d.fp16Tflops}T`;
+    document.getElementById('device-info').innerHTML = formatDeviceInfoLine(d);
     renderOps();
 }
 

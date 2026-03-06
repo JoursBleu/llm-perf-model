@@ -420,15 +420,8 @@ function evaluate() {
     const flashAttn = document.getElementById('flash-attn').checked;
 
     // Show model & device info
-    const moeTag = model.moe ? ` (MoE ${model.numExperts}×top${model.topK})` : '';
-    const kvLabel = {16:'FP16',8:'INT8/FP8',4:'INT4',2:'INT2'}[kvBits] || kvBits+'bit';
-    document.getElementById('model-info').innerHTML =
-        `<div>${(model.params/1e9).toFixed(1)}B params${moeTag}</div>` +
-        `<div>${model.layers}L · ${model.heads}H · dim ${model.hiddenDim}</div>`;
-    document.getElementById('device-info').innerHTML =
-        `<div>${device.vram} GB · ${device.bw} GB/s</div>` +
-        `<div>${getDeviceTflops(device, quantBits)} TFLOPS (${quantBits <= 8 ? 'INT8' : 'FP16'})</div>` +
-        `<div>KV cache: ${kvLabel}</div>`;
+    document.getElementById('model-info').innerHTML = formatModelInfoLine(model);
+    document.getElementById('device-info').innerHTML = formatDeviceInfoLine(device);
 
     // Evaluate selected combo
     const r = evalBot(model, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits);

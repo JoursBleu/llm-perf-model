@@ -426,6 +426,14 @@ function populateDeviceSelect(selectEl) {
     }
 }
 
+function formatModelInfoLine(model) {
+    return `${(model.params/1e9).toFixed(1)}B${model.moe?` (active ${(model.activeParams/1e9).toFixed(1)}B)`:''} | ${model.layers}L | ${model.heads}H | ${model.hiddenDim}D${model.moe?` | MoE ${model.numExperts}×top${model.topK}`:''}`;
+}
+
+function formatDeviceInfoLine(device) {
+    return `${device.vram}GB | ${device.bw} GB/s | FP16: ${device.fp16Tflops}T`;
+}
+
 // Sync config between pages via URL params
 function saveConfigToURL() {
     const params = new URLSearchParams();

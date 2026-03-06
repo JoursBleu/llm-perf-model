@@ -585,18 +585,12 @@ function renderScaling(r) {
 
 function onModelChange() {
     const m = MODELS[document.getElementById('model-select').value];
-    document.getElementById('model-info').innerHTML = `
-        <div>Params: <span class="text-gray-300">${(m.params/1e9).toFixed(1)}B</span>${m.moe?` (active: ${(m.activeParams/1e9).toFixed(1)}B)`:''}</div>
-        <div>Layers: ${m.layers} | Heads: ${m.heads} (KV: ${m.kvHeads}) | Dim: ${m.hiddenDim}</div>
-        <div>Context: ${(m.maxCtx/1024).toFixed(0)}K ${m.moe?`| MoE: ${m.numExperts} experts top-${m.topK}`:''}</div>
-        ${m.note?`<div class="text-yellow-500">${m.note}</div>`:''}`;
+    document.getElementById('model-info').innerHTML = formatModelInfoLine(m);
     calculate();
 }
 function onDeviceChange() {
     const d = DEVICES[document.getElementById('device-select').value];
-    document.getElementById('device-info').innerHTML = `
-        <div>VRAM: ${d.vram} GB | BW: ${d.bw} GB/s</div>
-        <div>FP16: ${d.fp16Tflops} TFLOPS | FP8: ${d.fp8Tflops} TFLOPS</div>`;
+    document.getElementById('device-info').innerHTML = formatDeviceInfoLine(d);
     calculate();
 }
 
