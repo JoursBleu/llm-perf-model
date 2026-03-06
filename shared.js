@@ -818,6 +818,9 @@ function setLang(lang) {
     if (typeof calculate === 'function') calculate();
     else if (typeof renderOps === 'function') renderOps();
     else if (typeof evaluate === 'function') evaluate();
+    // 刷新模型/设备详情面板的语言
+    if (typeof onModelChange === 'function') onModelChange();
+    if (typeof onDeviceChange === 'function') onDeviceChange();
 }
 
 function onLangChange(sel) {
