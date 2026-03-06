@@ -815,12 +815,17 @@ function setLang(lang) {
     const sel = document.getElementById('lang-select');
     if (sel) sel.value = lang;
     applyI18n();
-    if (typeof calculate === 'function') calculate();
-    else if (typeof renderOps === 'function') renderOps();
-    else if (typeof evaluate === 'function') evaluate();
-    // 刷新模型/设备详情面板的语言
-    if (typeof onModelChange === 'function') onModelChange();
-    if (typeof onDeviceChange === 'function') onDeviceChange();
+    // 刷新模型/设备详情面板的语言（先执行，它们内部会触发 recalc）
+    try { if (typeof onModelChange === 'function') onModelChange(); } catch(e) { console.warn('setLang onModelChange:', e); }
+    try { if (typeof onDeviceChange === 'function') onDeviceChange(); } catch(e) { console.warn('setLang onDeviceChange:', e); }
+    // 如果页面没有 onModelChange/onDeviceChange（如 robot.html），回退到直接 recalc
+    if (typeof onModelChange !== 'function' && typeof onDeviceChange !== 'function') {
+        try {
+            if (typeof calculate === 'function') calculate();
+            else if (typeof renderOps === 'function') renderOps();
+            else if (typeof evaluate === 'function') evaluate();
+        } catch(e) { console.warn('setLang recalc:', e); }
+    }
 }
 
 function onLangChange(sel) {
