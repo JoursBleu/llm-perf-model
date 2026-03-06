@@ -165,7 +165,7 @@
                 </div>
                 <div class="pt-2 border-t border-gray-800 text-xs text-gray-500 space-y-1 mt-2">
                     <div class="flex justify-between"><span data-i18n="robot.reading.speed">Human reading</span><span class="mono">~4-5 tok/s</span></div>
-                    <div class="flex justify-between"><span data-i18n="robot.comfort.speed">Comfortable stream</span><span class="mono">~20-30 tok/s</span></div>
+                    <div class="flex justify-between"><span data-i18n="robot.comfort.speed">Barely usable</span><span class="mono">~100 tok/s</span></div>
                 </div>
             </div>
         </div>
@@ -373,8 +373,8 @@ function fmtTime(ms) {
 
 function grade(r) {
     if (r.oom) return 'oom';
-    if (r.tps >= 20 && r.ttftMs <= 2000) return 'a';
-    if (r.tps >= 5 && r.ttftMs <= 5000) return 'b';
+    if (r.tps >= 200 && r.ttftMs <= 2000) return 'a';
+    if (r.tps >= 100 && r.ttftMs <= 5000) return 'b';
     return 'c';
 }
 
@@ -654,36 +654,36 @@ function renderTPSChart(model, modelKey, quantBits, ctxTokens, respTokens, concU
             afterDraw(chart) {
                 const xScale = chart.scales.x;
                 const c = chart.ctx;
-                // 20 tok/s line
-                const x20 = xScale.getPixelForValue(20);
-                if (x20 >= chart.chartArea.left && x20 <= chart.chartArea.right) {
+                // 200 tok/s line
+                const x200 = xScale.getPixelForValue(200);
+                if (x200 >= chart.chartArea.left && x200 <= chart.chartArea.right) {
                     c.save();
                     c.beginPath();
                     c.strokeStyle = '#22c55e';
                     c.lineWidth = 2;
                     c.setLineDash([6, 4]);
-                    c.moveTo(x20, chart.chartArea.top);
-                    c.lineTo(x20, chart.chartArea.bottom);
+                    c.moveTo(x200, chart.chartArea.top);
+                    c.lineTo(x200, chart.chartArea.bottom);
                     c.stroke();
                     c.fillStyle = '#22c55e';
                     c.font = '10px sans-serif';
-                    c.fillText('20 tok/s', x20 + 4, chart.chartArea.top + 12);
+                    c.fillText('200 tok/s', x200 + 4, chart.chartArea.top + 12);
                     c.restore();
                 }
-                // 5 tok/s line
-                const x5 = xScale.getPixelForValue(5);
-                if (x5 >= chart.chartArea.left && x5 <= chart.chartArea.right) {
+                // 100 tok/s line
+                const x100 = xScale.getPixelForValue(100);
+                if (x100 >= chart.chartArea.left && x100 <= chart.chartArea.right) {
                     c.save();
                     c.beginPath();
                     c.strokeStyle = '#eab308';
                     c.lineWidth = 1.5;
                     c.setLineDash([4, 4]);
-                    c.moveTo(x5, chart.chartArea.top);
-                    c.lineTo(x5, chart.chartArea.bottom);
+                    c.moveTo(x100, chart.chartArea.top);
+                    c.lineTo(x100, chart.chartArea.bottom);
                     c.stroke();
                     c.fillStyle = '#eab308';
                     c.font = '10px sans-serif';
-                    c.fillText('5 tok/s', x5 + 4, chart.chartArea.top + 24);
+                    c.fillText('100 tok/s', x100 + 4, chart.chartArea.top + 24);
                     c.restore();
                 }
             }
