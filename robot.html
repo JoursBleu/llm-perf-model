@@ -84,59 +84,13 @@
     </div>
 
     <!-- ════ Selected Combo Result ════ -->
-    <div id="result-section">
+    <div id="result-section" class="max-w-6xl mx-auto">
         <!-- Grade Banner -->
         <div id="grade-banner" class="rounded-xl p-6 border-2 mb-8 text-center transition-all"></div>
-
-        <!-- Result Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
-                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.ttft">TTFT</div>
-                <div id="res-ttft" class="text-2xl font-bold text-green-400 mono">—</div>
-                <div class="text-xs text-gray-500 mt-1" data-i18n="robot.res.ttft.sub">Time to First Token</div>
-            </div>
-            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
-                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.tps">Decode</div>
-                <div id="res-tps" class="text-2xl font-bold text-blue-400 mono">—</div>
-                <div class="text-xs text-gray-500 mt-1">tokens/sec</div>
-            </div>
-            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
-                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.total">Total</div>
-                <div id="res-total" class="text-2xl font-bold text-yellow-400 mono">—</div>
-                <div class="text-xs text-gray-500 mt-1" data-i18n="robot.res.total.sub">Full response</div>
-            </div>
-            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
-                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.mem">Memory</div>
-                <div id="res-mem" class="text-2xl font-bold text-purple-400 mono">—</div>
-                <div class="text-xs text-gray-500 mt-1" id="res-mem-detail">— / — GB</div>
-            </div>
-            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
-                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.conc">Max Conc.</div>
-                <div id="res-conc" class="text-2xl font-bold text-cyan-400 mono">—</div>
-                <div class="text-xs text-gray-500 mt-1" data-i18n="robot.res.conc.sub">conversations</div>
-            </div>
-        </div>
-
-        <!-- Memory Breakdown Bar -->
-        <div class="bg-card rounded-xl p-6 border border-gray-800 mb-8">
-            <h3 class="font-semibold mb-3" data-i18n="robot.mem.title">Memory Breakdown</h3>
-            <div class="flex h-6 rounded-full overflow-hidden bg-gray-800 mb-2">
-                <div id="bar-weights" class="bg-purple-500 transition-all" style="width:0%" title="Weights"></div>
-                <div id="bar-kv" class="bg-blue-500 transition-all" style="width:0%" title="KV Cache"></div>
-                <div id="bar-act" class="bg-green-500 transition-all" style="width:0%" title="Activations"></div>
-                <div id="bar-free" class="bg-gray-700 transition-all" style="width:0%" title="Free"></div>
-            </div>
-            <div class="flex flex-wrap gap-4 text-xs text-gray-400">
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-purple-500 inline-block"></span> <span id="lbl-weights">Weights: — GB</span></span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> <span id="lbl-kv">KV Cache: — GB</span></span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-500 inline-block"></span> <span id="lbl-act">Activations: — GB</span></span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-gray-700 inline-block"></span> <span id="lbl-free">Free: — GB</span></span>
-            </div>
-        </div>
     </div>
 
     <!-- Config: Scenario + (Model/Device) + Options -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 max-w-6xl mx-auto">
         <!-- Scenario Presets + Chat Params -->
         <div class="bg-card rounded-xl p-6 border border-gray-800">
             <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">💬 <span data-i18n="robot.scenario">Scenario</span></h2>
@@ -213,6 +167,55 @@
                     <div class="flex justify-between"><span data-i18n="robot.reading.speed">Human reading</span><span class="mono">~4-5 tok/s</span></div>
                     <div class="flex justify-between"><span data-i18n="robot.comfort.speed">Comfortable stream</span><span class="mono">~20-30 tok/s</span></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrics Under Config -->
+    <div id="result-metrics" class="max-w-6xl mx-auto">
+        <!-- Result Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
+                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.ttft">TTFT</div>
+                <div id="res-ttft" class="text-2xl font-bold text-green-400 mono">—</div>
+                <div class="text-xs text-gray-500 mt-1" data-i18n="robot.res.ttft.sub">Time to First Token</div>
+            </div>
+            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
+                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.tps">Decode</div>
+                <div id="res-tps" class="text-2xl font-bold text-blue-400 mono">—</div>
+                <div class="text-xs text-gray-500 mt-1">tokens/sec</div>
+            </div>
+            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
+                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.total">Total</div>
+                <div id="res-total" class="text-2xl font-bold text-yellow-400 mono">—</div>
+                <div class="text-xs text-gray-500 mt-1" data-i18n="robot.res.total.sub">Full response</div>
+            </div>
+            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
+                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.mem">Memory</div>
+                <div id="res-mem" class="text-2xl font-bold text-purple-400 mono">—</div>
+                <div class="text-xs text-gray-500 mt-1" id="res-mem-detail">— / — GB</div>
+            </div>
+            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
+                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.conc">Max Conc.</div>
+                <div id="res-conc" class="text-2xl font-bold text-cyan-400 mono">—</div>
+                <div class="text-xs text-gray-500 mt-1" data-i18n="robot.res.conc.sub">conversations</div>
+            </div>
+        </div>
+
+        <!-- Memory Breakdown Bar -->
+        <div class="bg-card rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 class="font-semibold mb-3" data-i18n="robot.mem.title">Memory Breakdown</h3>
+            <div class="flex h-6 rounded-full overflow-hidden bg-gray-800 mb-2">
+                <div id="bar-weights" class="bg-purple-500 transition-all" style="width:0%" title="Weights"></div>
+                <div id="bar-kv" class="bg-blue-500 transition-all" style="width:0%" title="KV Cache"></div>
+                <div id="bar-act" class="bg-green-500 transition-all" style="width:0%" title="Activations"></div>
+                <div id="bar-free" class="bg-gray-700 transition-all" style="width:0%" title="Free"></div>
+            </div>
+            <div class="flex flex-wrap gap-4 text-xs text-gray-400">
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-purple-500 inline-block"></span> <span id="lbl-weights">Weights: — GB</span></span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> <span id="lbl-kv">KV Cache: — GB</span></span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-500 inline-block"></span> <span id="lbl-act">Activations: — GB</span></span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-gray-700 inline-block"></span> <span id="lbl-free">Free: — GB</span></span>
             </div>
         </div>
     </div>
