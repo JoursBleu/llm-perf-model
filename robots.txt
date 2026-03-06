@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://joursbleu.github.io/llm-perf-model/sitemap.xml
