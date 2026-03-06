@@ -201,7 +201,7 @@
     <p data-i18n="footer.ops">LLM Perf Model — Per-operation Roofline analysis runs in your browser. Estimates are theoretical upper bounds.</p>
 </footer>
 
-<script src="shared.js?v=10"></script>
+<script src="shared.js?v=11"></script>
 <script>
 // ── Init ──
 populateModelSelect(document.getElementById('model-select'));
@@ -340,12 +340,18 @@ function renderOps() {
 
 function onModelChange() {
     const m = MODELS[document.getElementById('model-select').value];
-    document.getElementById('model-info').innerHTML = formatModelInfoLine(m);
+    const modelInfo = (typeof formatModelInfoLine === 'function')
+        ? formatModelInfoLine(m)
+        : `${(m.params/1e9).toFixed(1)}B${m.moe?` (active ${(m.activeParams/1e9).toFixed(1)}B)`:''} | ${m.layers}L | ${m.heads}H | ${m.hiddenDim}D${m.moe?` | MoE ${m.numExperts}×top${m.topK}`:''}`;
+    document.getElementById('model-info').innerHTML = modelInfo;
     renderOps();
 }
 function onDeviceChange() {
     const d = DEVICES[document.getElementById('device-select').value];
-    document.getElementById('device-info').innerHTML = formatDeviceInfoLine(d);
+    const deviceInfo = (typeof formatDeviceInfoLine === 'function')
+        ? formatDeviceInfoLine(d)
+        : `${d.vram}GB | ${d.bw} GB/s | FP16: ${d.fp16Tflops}T`;
+    document.getElementById('device-info').innerHTML = deviceInfo;
     renderOps();
 }
 

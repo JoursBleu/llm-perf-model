@@ -267,7 +267,7 @@
     LLM Perf Model — AI Bot Sizer. All calculations run in your browser.
 </footer>
 
-<script src="shared.js?v=10"></script>
+<script src="shared.js?v=11"></script>
 <script>
 // ============ SCENARIO PRESETS ============
 const SCENARIOS = {
@@ -420,8 +420,14 @@ function evaluate() {
     const flashAttn = document.getElementById('flash-attn').checked;
 
     // Show model & device info
-    document.getElementById('model-info').innerHTML = formatModelInfoLine(model);
-    document.getElementById('device-info').innerHTML = formatDeviceInfoLine(device);
+    const modelInfo = (typeof formatModelInfoLine === 'function')
+        ? formatModelInfoLine(model)
+        : `${(model.params/1e9).toFixed(1)}B${model.moe?` (active ${(model.activeParams/1e9).toFixed(1)}B)`:''} | ${model.layers}L | ${model.heads}H | ${model.hiddenDim}D${model.moe?` | MoE ${model.numExperts}×top${model.topK}`:''}`;
+    const deviceInfo = (typeof formatDeviceInfoLine === 'function')
+        ? formatDeviceInfoLine(device)
+        : `${device.vram}GB | ${device.bw} GB/s | FP16: ${device.fp16Tflops}T`;
+    document.getElementById('model-info').innerHTML = modelInfo;
+    document.getElementById('device-info').innerHTML = deviceInfo;
 
     // Evaluate selected combo
     const r = evalBot(model, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits);
