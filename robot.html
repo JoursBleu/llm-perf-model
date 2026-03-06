@@ -267,7 +267,7 @@
     LLM Perf Model — AI Bot Sizer. All calculations run in your browser.
 </footer>
 
-<script src="shared.js?v=11"></script>
+<script src="shared.js?v=12"></script>
 <script>
 // ============ SCENARIO PRESETS ============
 const SCENARIOS = {
@@ -374,7 +374,7 @@ function fmtTime(ms) {
 function grade(r) {
     if (r.oom) return 'oom';
     if (r.tps >= 200 && r.ttftMs <= 2000) return 'a';
-    if (r.tps >= 100 && r.ttftMs <= 10000) return 'b';
+    if (r.tps >= 99.5 && r.ttftMs <= 10000) return 'b';
     return 'c';
 }
 
