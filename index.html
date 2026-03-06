@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="AWl1KvffncWtkBzHG9EkyPN5bxQRxne9-5xpV5tN_DY" />
+    <title>LLM Performance Model — Prefill & Decode Estimator</title>
+    <meta name="description" content="Estimate LLM inference performance: prefill latency, decode throughput, TTFT, memory usage for popular models on various GPUs. Roofline analysis included.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script>tailwind.config={theme:{extend:{colors:{primary:'#6366f1',dark:'#0f172a',card:'#1e293b',surface:'#334155'}}}}</script>
+    <style>
+        body{font-family:'Inter',system-ui,sans-serif}
+        .mono{font-family:'Fira Code','Consolas',monospace}
+        input[type=range]{-webkit-appearance:none;height:6px;border-radius:3px;background:#334155}
+        input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#6366f1;cursor:pointer}
+        .result-card{transition:all .2s}
+        .result-card:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(99,102,241,.15)}
+        select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;-webkit-appearance:none}
+        .tooltip{position:relative}.tooltip:hover::after{content:attr(data-tip);position:absolute;bottom:125%;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:4px 10px;border-radius:6px;font-size:12px;white-space:nowrap;z-index:50}
+        .nav-link{transition:all .15s} .nav-link:hover{color:#fff} .nav-active{color:#6366f1;border-bottom:2px solid #6366f1}
+        /* ── Light theme ── */
+        html.light { color-scheme: light; }
+        html.light .bg-dark { background-color: #f8fafc; }
+        html.light .bg-dark\/80 { background-color: rgba(248,250,252,0.85); }
+        html.light .bg-card { background-color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        html.light .bg-surface { background-color: #f1f5f9; }
+        html.light .text-gray-100 { color: #0f172a; }
+        html.light .text-gray-200 { color: #1e293b; }
+        html.light .text-gray-300 { color: #334155; }
+        html.light .text-gray-400 { color: #64748b; }
+        html.light .text-gray-500 { color: #94a3b8; }
+        html.light .border-gray-600, html.light .border-gray-700, html.light .border-gray-800 { border-color: #e2e8f0; }
+        html.light .bg-gray-600 { background-color: #cbd5e1; }
+        html.light .bg-gray-800 { background-color: #e2e8f0; }
+        html.light .divide-gray-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0; }
+        html.light .divide-gray-800\/50 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(226,232,240,0.5); }
+        html.light .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.04); }
+        html.light input[type=range] { background: #cbd5e1; }
+        html.light select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); }
+        html.light .nav-link:hover { color: #0f172a; }
+        html.light .hover\:text-white:hover { color: #0f172a; }
+        html.light .text-green-400 { color: #16a34a; }
+        html.light .text-blue-400 { color: #2563eb; }
+        html.light .text-yellow-400 { color: #ca8a04; }
+        html.light .text-red-400 { color: #dc2626; }
+        html.light .text-purple-400 { color: #9333ea; }
+        html.light .text-cyan-400 { color: #0891b2; }
+        html.light .text-orange-400 { color: #ea580c; }
+        html.light .text-emerald-400 { color: #059669; }
+        html.light .text-sky-400 { color: #0284c7; }
+        html.light .text-amber-400 { color: #d97706; }
+        html.light .text-yellow-500 { color: #a16207; }
+        html.light .from-indigo-900\/30 { --tw-gradient-from: rgba(99,102,241,0.08); }
+        html.light .to-cyan-900\/30 { --tw-gradient-to: rgba(6,182,212,0.08); }
+        html.light .border-indigo-800\/40 { border-color: rgba(99,102,241,0.2); }
+    </style>
+</head>
+<body class="bg-dark text-gray-100 min-h-screen">
+
+<!-- Header -->
+<header class="border-b border-gray-800 bg-dark/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
+        <div class="flex items-center gap-2 text-xl font-bold shrink-0"><span class="text-2xl">⚡</span><span class="text-primary">LLM Perf Model</span></div>
+        <nav class="flex items-center gap-4 text-sm">
+            <a href="index.html" class="nav-link nav-active py-1 font-medium">📊 <span data-i18n="nav.overall">Overall</span></a>
+            <a id="nav-ops" href="ops.html" class="nav-link py-1 text-gray-400">🔬 <span data-i18n="nav.ops">Per-Op</span></a>
+            <a id="nav-robot" href="robot.html" class="nav-link py-1 text-gray-400">🤖 <span data-i18n="nav.robot">Bot</span></a>
+        </nav>
+        <div class="ml-auto flex items-center gap-3 text-sm">
+            <select id="lang-select" onchange="onLangChange(this)" class="bg-transparent text-gray-400 hover:text-primary pl-2 pr-5 py-1 rounded-lg hover:bg-surface transition-colors font-medium text-sm cursor-pointer border-none outline-none">
+                <option value="en" class="bg-gray-800 text-white">EN</option>
+                <option value="zh" class="bg-gray-800 text-white">中文</option>
+            </select>
+            <button id="theme-toggle" onclick="cycleTheme()" class="text-gray-400 hover:text-primary px-2 py-1 rounded-lg hover:bg-surface transition-colors flex items-center gap-1" title="Theme">🌗 Auto</button>
+            <a href="https://github.com/JoursBleu/llm-perf-model" target="_blank" class="text-gray-400 hover:text-white flex items-center gap-1">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                GitHub
+            </a>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 py-8">
+    <div class="text-center mb-10">
+        <h1 class="text-3xl md:text-4xl font-bold mb-3" data-i18n="hero.title">LLM Inference Performance Estimator</h1>
+        <p class="text-gray-400 max-w-2xl mx-auto" data-i18n="hero.desc">Estimate prefill latency, decode throughput, memory usage, and TTFT for LLMs on various GPUs using Roofline analysis.</p>
+    </div>
+
+    <!-- Config Panel -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Model -->
+        <div class="bg-card rounded-xl p-6 border border-gray-800">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🧠 <span data-i18n="cfg.model">Model</span></h2>
+            <select id="model-select" onchange="onModelChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-4 pr-8"></select>
+            <div id="model-info" class="text-sm text-gray-500 space-y-1"></div>
+        </div>
+        <!-- Device -->
+        <div class="bg-card rounded-xl p-6 border border-gray-800">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🖥️ <span data-i18n="cfg.device">Device</span></h2>
+            <select id="device-select" onchange="onDeviceChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-4 pr-8"></select>
+            <div id="device-info" class="text-sm text-gray-500 space-y-1"></div>
+        </div>
+        <!-- Parameters -->
+        <div class="bg-card rounded-xl p-6 border border-gray-800">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">⚙️ <span data-i18n="cfg.params">Parameters</span></h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.quant">Quantization</span></label>
+                    <select id="quant" onchange="onQuantChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1 pr-8">
+                        <option value="16">FP16 / BF16</option>
+                        <option value="8">INT8 / FP8</option>
+                        <option value="4" selected>INT4 / GPTQ / AWQ</option>
+                        <option value="3">3-bit (GGUF Q3)</option>
+                        <option value="2">2-bit (GGUF Q2)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="robot.kv.dtype">KV Cache Precision</span></label>
+                    <select id="kv-quant" onchange="calculate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1 pr-8">
+                        <option value="16">FP16</option>
+                        <option value="8" selected>INT8 / FP8</option>
+                        <option value="4">INT4</option>
+                        <option value="2">INT2</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.prompt">Prompt Length (prefill)</span><span id="prompt-val" class="text-primary">512</span></label>
+                    <input type="range" id="prompt-len" min="32" max="32768" value="512" step="32" oninput="document.getElementById('prompt-val').textContent=this.value;calculate()" class="w-full mt-1">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.output">Output Length (decode)</span><span id="output-val" class="text-primary">256</span></label>
+                    <input type="range" id="output-len" min="16" max="8192" value="256" step="16" oninput="document.getElementById('output-val').textContent=this.value;calculate()" class="w-full mt-1">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.batch">Batch Size</span><span id="batch-val" class="text-primary">1</span></label>
+                    <input type="range" id="batch-size" min="1" max="128" value="1" step="1" oninput="document.getElementById('batch-val').textContent=this.value;calculate()" class="w-full mt-1">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.tp">Tensor Parallel (GPUs)</span><span id="tp-val" class="text-primary">1</span></label>
+                    <input type="range" id="tp-size" min="1" max="8" value="1" step="1" oninput="document.getElementById('tp-val').textContent=this.value;calculate()" class="w-full mt-1">
+                </div>
+                <div class="flex items-center justify-between">
+                    <label class="text-sm text-gray-400" data-i18n="cfg.flash">FlashAttention</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="flash-attn" checked onchange="calculate()" class="sr-only peer">
+                        <div class="w-9 h-5 bg-gray-600 rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        <span class="ml-2 text-sm text-gray-500" data-i18n="cfg.flash.note">IO-aware tiling</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="result-card bg-card rounded-xl p-5 border border-gray-800 text-center">
+            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="res.prefill">Prefill Latency</div>
+            <div id="res-prefill" class="text-2xl font-bold text-green-400 mono">—</div>
+            <div class="text-sm text-gray-500 mt-1" data-i18n="res.prefill.sub">Time to First Token</div>
+        </div>
+        <div class="result-card bg-card rounded-xl p-5 border border-gray-800 text-center">
+            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="res.decode">Decode Speed</div>
+            <div id="res-decode" class="text-2xl font-bold text-blue-400 mono">—</div>
+            <div class="text-sm text-gray-500 mt-1" data-i18n="res.decode.unit">tokens/sec</div>
+        </div>
+        <div class="result-card bg-card rounded-xl p-5 border border-gray-800 text-center">
+            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="res.total">Total Time</div>
+            <div id="res-total" class="text-2xl font-bold text-yellow-400 mono">—</div>
+            <div class="text-sm text-gray-500 mt-1" data-i18n="res.total.sub">Prefill + Decode</div>
+        </div>
+        <div class="result-card bg-card rounded-xl p-5 border border-gray-800 text-center">
+            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="res.mem">Model Memory</div>
+            <div id="res-mem" class="text-2xl font-bold text-purple-400 mono">—</div>
+            <div class="text-sm text-gray-500 mt-1" id="res-mem-detail" data-i18n="res.mem.sub">Weights + KV Cache</div>
+        </div>
+    </div>
+
+    <!-- Performance Breakdown (left) | Roofline + Memory (right) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Left: Performance Breakdown -->
+        <div class="bg-card rounded-xl p-6 border border-gray-800">
+            <h3 class="font-semibold mb-4">📊 <span data-i18n="sec.breakdown">Performance Breakdown</span></h3>
+            <table class="w-full text-sm">
+                <tbody id="breakdown-table" class="divide-y divide-gray-800"></tbody>
+            </table>
+        </div>
+        <!-- Right: Roofline + Memory stacked -->
+        <div class="flex flex-col gap-6">
+            <div class="bg-card rounded-xl p-6 border border-gray-800">
+                <h3 class="font-semibold mb-4">📈 <span data-i18n="sec.roofline">Roofline Analysis</span></h3>
+                <div style="position:relative;height:240px"><canvas id="roofline-chart"></canvas></div>
+            </div>
+            <div class="bg-card rounded-xl p-6 border border-gray-800">
+                <h3 class="font-semibold mb-4">💾 <span data-i18n="sec.memory">Memory Breakdown</span></h3>
+                <div class="grid grid-cols-1 gap-3 mb-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-400" data-i18n="mem.weights">Model Weights</span>
+                        <span id="mem-weights" class="text-base font-bold mono text-purple-400">—</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-400" data-i18n="mem.kv">KV Cache (per request)</span>
+                        <span id="mem-kv" class="text-base font-bold mono text-cyan-400">—</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-400" data-i18n="mem.act">Activation Memory (est.)</span>
+                        <span id="mem-act" class="text-base font-bold mono text-orange-400">—</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-sm text-gray-500 mb-1">
+                        <span data-i18n="mem.usage">Memory Usage</span>
+                        <span id="mem-pct">—</span>
+                    </div>
+                    <div class="w-full bg-gray-800 rounded-full h-4 overflow-hidden">
+                        <div id="mem-bar" class="h-4 rounded-full transition-all" style="width:0%;background:linear-gradient(90deg,#8b5cf6,#06b6d4)"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- CTA to Per-Op page -->
+            <a id="cta-ops" href="ops.html" class="block bg-gradient-to-r from-indigo-900/30 to-cyan-900/30 rounded-xl p-4 border border-indigo-800/40 text-center hover:border-indigo-600 transition-colors">
+                <span class="text-gray-300 text-sm" data-i18n="cta.ops">Want per-operation breakdown?</span>
+                <span class="block mt-1 text-white font-medium" data-i18n="cta.ops.btn">🔬 Per-Op Layer Breakdown →</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Multi-Device Comparison -->
+    <div class="bg-card rounded-xl p-6 border border-gray-800 mb-8">
+        <h3 class="font-semibold mb-4">🔀 <span data-i18n="sec.compare">Multi-Device Comparison</span></h3>
+        <p class="text-sm text-gray-500 mb-4" data-i18n="sec.compare.desc">Compare current model + settings across all devices (only showing devices with enough VRAM)</p>
+        <div style="position:relative;height:300px"><canvas id="compare-chart"></canvas></div>
+    </div>
+
+    <!-- Multi-GPU Scaling -->
+    <div class="bg-card rounded-xl p-6 border border-gray-800 mb-8">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h3 class="font-semibold">🔄 <span data-i18n="sec.multigpu">Multi-GPU Scaling</span></h3>
+            <div id="mg-interconnect-info" class="text-sm text-gray-500 mono"></div>
+        </div>
+        <p class="text-sm text-gray-500 mb-4" data-i18n="sec.multigpu.desc">Tensor Parallel performance scaling with interconnect-aware communication modeling</p>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div style="position:relative;height:300px"><canvas id="scaling-chart"></canvas></div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-gray-500 border-b border-gray-700">
+                            <th class="py-2 text-left font-medium" data-i18n="mg.config">Config</th>
+                            <th class="py-2 text-right font-medium" data-i18n="mg.decode">Decode</th>
+                            <th class="py-2 text-right font-medium" data-i18n="mg.prefill">Prefill</th>
+                            <th class="py-2 text-right font-medium" data-i18n="mg.speedup">Speedup</th>
+                            <th class="py-2 text-right font-medium" data-i18n="mg.efficiency">Efficiency</th>
+                            <th class="py-2 text-right font-medium" data-i18n="mg.vram">VRAM/GPU</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scaling-table" class="divide-y divide-gray-800"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulas -->
+    <details class="bg-card rounded-xl border border-gray-800 mb-8">
+        <summary class="p-6 cursor-pointer font-semibold hover:text-primary">📐 <span data-i18n="formulas.title">Modeling Methodology & Formulas</span></summary>
+        <div class="px-6 pb-6 text-sm text-gray-400 space-y-3">
+            <p><strong class="text-gray-200" data-i18n="formulas.prefill.title">Prefill (Compute-Bound):</strong> <span data-i18n="formulas.prefill.desc">Processing the entire prompt is compute-intensive. FLOPs ≈ 2 × Params × SeqLen + Attention O(n²). For MoE models, only active parameters participate.</span></p>
+            <p class="mono text-sm bg-dark rounded p-2">Prefill Time = (Linear FLOPs + Attn FLOPs) / (Effective TFLOPS × 10¹²)</p>
+            <p><strong class="text-gray-200" data-i18n="formulas.decode.title">Decode (Memory-Bandwidth-Bound):</strong> <span data-i18n="formulas.decode.desc">Each token reads all weights + KV cache from VRAM. Time = max(compute, memory).</span></p>
+            <p class="mono text-sm bg-dark rounded p-2">Decode Time/Token = Model Size (bytes) / (Memory BW × TP × BW Utilization)</p>
+            <p><strong class="text-gray-200" data-i18n="formulas.kv.title">KV Cache:</strong> <span data-i18n="formulas.kv.desc">2 × layers × kv_heads × head_dim × seq_len × bytes. GQA/MLA significantly reduces KV Cache.</span></p>
+            <p><strong class="text-gray-200" data-i18n="formulas.ai.title">Arithmetic Intensity:</strong> <span data-i18n="formulas.ai.desc">FLOPs/Byte — determines compute-bound vs memory-bound. Prefill AI ≈ SeqLen (high), Decode AI ≈ 1 (low).</span></p>
+            <p><strong class="text-gray-200" data-i18n="formulas.flash.title">FlashAttention:</strong> <span data-i18n="formulas.flash.desc">IO-aware tiling keeps N×N scores in SRAM. Without it, O(N²) HBM traffic + lower utilization (~40%).</span></p>
+        </div>
+    </details>
+</main>
+
+<footer class="border-t border-gray-800 py-6 text-center text-gray-500 text-sm">
+    <p data-i18n="footer.index">LLM Perf Model — All calculations run in your browser. Estimates are theoretical upper bounds.</p>
+</footer>
+
+<script src="shared.js?v=10"></script>
+<script>
+// ── Populate selects from shared data ──
+populateModelSelect(document.getElementById('model-select'));
+populateDeviceSelect(document.getElementById('device-select'));
+loadConfigFromURL();
+
+function onQuantChange() {
+    const q = parseInt(document.getElementById('quant').value);
+    const kvSel = document.getElementById('kv-quant');
+    if (kvSel) {
+        if (q >= 16) kvSel.value = '16';
+        else if (q >= 8) kvSel.value = '8';
+        else kvSel.value = '8';
+    }
+    calculate();
+}
+
+let rooflineChart = null;
+let compareChart = null;
+let scalingChart = null;
+
+function runCalc() {
+    const cfg = readConfig();
+    const { model, device, quantBits, kvBits, promptLen, outputLen, batchSize, tp, flashAttn,
+            effectiveTflops, effectiveBW, modelKey, deviceKey } = cfg;
+
+    // Memory
+    const modelSizeGB = calcModelSizeGB(model, quantBits);
+    const activeModelSizeGB = calcActiveModelSizeGB(model, quantBits);
+    const kvGB = calcKVCacheGB(model, promptLen + outputLen, batchSize, quantBits, kvBits);
+    let activationGB = (model.hiddenDim * promptLen * batchSize * 4 * 2) / 1e9;
+    let attnScoreMemGB = 0;
+    if (!flashAttn) {
+        attnScoreMemGB = (batchSize * model.heads * promptLen * promptLen * 4) / 1e9;
+        activationGB += attnScoreMemGB;
+    }
+    const totalMemGB = modelSizeGB + kvGB + activationGB;
+    const deviceMemGB = device.vram * tp;
+    const fitsInMemory = totalMemGB <= deviceMemGB;
+
+    // Prefill
+    const prefillLinearFlops = 2 * model.activeParams * promptLen * batchSize;
+    const prefillAttnFlops = calcAttentionFlopsPrefill(model, promptLen, batchSize);
+    const prefillTotalFlops = prefillLinearFlops + prefillAttnFlops;
+    let prefillTimeS;
+    if (flashAttn) {
+        prefillTimeS = prefillTotalFlops / (effectiveTflops * 1e12);
+    } else {
+        const attnUtilFactor = 0.40 / COMPUTE_UTIL;
+        prefillTimeS = prefillLinearFlops / (effectiveTflops * 1e12)
+                     + prefillAttnFlops / (effectiveTflops * 1e12 * attnUtilFactor);
+    }
+    const prefillMs = prefillTimeS * 1000;
+    const prefillTPS = prefillTimeS > 0 ? (promptLen * batchSize) / prefillTimeS : 0;
+
+    // Decode
+    const decodeLinearFlops = 2 * model.activeParams * batchSize;
+    const avgDecodePos = promptLen + outputLen / 2;
+    const decodeAttnFlops = calcAttentionFlopsDecodeStep(model, avgDecodePos, batchSize);
+    const decodeTotalFlopsPerStep = decodeLinearFlops + decodeAttnFlops;
+    const activeModelBytes = model.activeParams * quantBits / 8;
+    let kvReadBytes = calcKVCacheGB(model, Math.floor(avgDecodePos), batchSize, quantBits, kvBits) * 1e9;
+    if (!flashAttn) kvReadBytes += 2 * batchSize * model.heads * avgDecodePos * 4 * model.layers;
+    const totalReadBytes = activeModelBytes + kvReadBytes;
+    const decodeMemBoundS = totalReadBytes / (effectiveBW * 1e9);
+    const decodeComputeBoundS = decodeTotalFlopsPerStep / (effectiveTflops * 1e12);
+    const decodeTimePerStepS = Math.max(decodeMemBoundS, decodeComputeBoundS);
+    const decodeTokenMs = (decodeTimePerStepS / batchSize) * 1000;
+    const decodeTPS = decodeTokenMs > 0 ? 1000 / decodeTokenMs : 0;
+    const decodeBottleneck = decodeMemBoundS >= decodeComputeBoundS ? 'memory' : 'compute';
+
+    // Total
+    const totalMs = prefillMs + decodeTokenMs * outputLen;
+    const totalOutputTPS = totalMs > 0 ? outputLen / (totalMs / 1000) : 0;
+
+    // Roofline
+    const ridgePoint = (effectiveTflops * 1e12) / (effectiveBW * 1e9);
+    const prefillAI = activeModelBytes > 0 ? prefillTotalFlops / activeModelBytes : 0;
+    const decodeAI = totalReadBytes > 0 ? decodeTotalFlopsPerStep / totalReadBytes : 0;
+
+    return { model, device, modelKey, deviceKey, quantBits, kvBits, promptLen, outputLen, batchSize, tp, flashAttn,
+        modelSizeGB, activeModelSizeGB, kvGB, activationGB, attnScoreMemGB, totalMemGB, deviceMemGB, fitsInMemory,
+        prefillLinearFlops, prefillAttnFlops, prefillTotalFlops, prefillMs, prefillTPS,
+        decodeLinearFlops, decodeAttnFlops, decodeTotalFlopsPerStep,
+        decodeMemBoundMs: decodeMemBoundS * 1000, decodeComputeBoundMs: decodeComputeBoundS * 1000,
+        decodeTokenMs, decodeTPS, decodeBottleneck,
+        totalMs, totalOutputTPS,
+        effectiveTflops, effectiveBW, ridgePoint, prefillAI, decodeAI };
+}
+
+function calculate() {
+    const r = runCalc();
+
+    // Sync nav links with current config
+    const qs = saveConfigToURL();
+    document.getElementById('nav-ops').href = 'ops.html?' + qs;
+    document.getElementById('cta-ops').href = 'ops.html?' + qs;
+
+    // Top cards
+    document.getElementById('res-prefill').textContent = formatMs(r.prefillMs);
+    document.getElementById('res-decode').textContent = r.fitsInMemory ? r.decodeTPS.toFixed(1) : 'OOM';
+    document.getElementById('res-total').textContent = r.fitsInMemory ? formatMs(r.totalMs) : 'OOM';
+    document.getElementById('res-mem').textContent = formatGB(r.totalMemGB);
+    document.getElementById('res-mem-detail').textContent = `${formatGB(r.modelSizeGB)} weights + ${formatGB(r.kvGB)} KV`;
+    const pEl = document.getElementById('res-prefill');
+    pEl.classList.toggle('text-red-400', !r.fitsInMemory);
+    pEl.classList.toggle('text-green-400', r.fitsInMemory);
+
+    // Memory
+    document.getElementById('mem-weights').textContent = formatGB(r.modelSizeGB);
+    document.getElementById('mem-kv').textContent = formatGB(r.kvGB);
+    document.getElementById('mem-act').textContent = formatGB(r.activationGB);
+    const pct = Math.min(100, (r.totalMemGB / r.deviceMemGB) * 100);
+    document.getElementById('mem-pct').textContent = `${formatGB(r.totalMemGB)} / ${formatGB(r.deviceMemGB)} (${pct.toFixed(1)}%)`;
+    document.getElementById('mem-bar').style.width = pct + '%';
+    document.getElementById('mem-bar').style.background = pct > 95 ? '#ef4444' : pct > 80 ? '#f59e0b' : 'linear-gradient(90deg,#8b5cf6,#06b6d4)';
+
+    // Breakdown table
+    const attnPct = r.prefillTotalFlops > 0 ? (r.prefillAttnFlops / r.prefillTotalFlops * 100).toFixed(1) : '0';
+    document.getElementById('breakdown-table').innerHTML = [
+        [t('tbl.model'), r.model.name],
+        [t('tbl.arch'), r.model.arch + (r.model.moe ? ` (MoE ${r.model.numExperts} experts, top-${r.model.topK})` : '')],
+        [t('tbl.params'), `${(r.model.params/1e9).toFixed(1)}B / ${(r.model.activeParams/1e9).toFixed(1)}B`],
+        [t('tbl.quant'), r.quantBits + '-bit'],
+        [t('tbl.device'), r.device.name + (r.tp > 1 ? ` × ${r.tp} TP` : '')],
+        [t('tbl.compute'), `${r.effectiveTflops.toFixed(0)} TFLOPS`],
+        [t('tbl.bw'), `${r.effectiveBW.toFixed(0)} GB/s`],
+        [t('tbl.ridge'), `${r.ridgePoint.toFixed(0)} FLOPs/Byte`],
+        [`<span class="text-green-400">${t('tbl.prefill.linear')}</span>`, fmtFlops(r.prefillLinearFlops)],
+        [`<span class="text-green-400">${t('tbl.prefill.attn')}</span>`, `${fmtFlops(r.prefillAttnFlops)} (${attnPct}%) — O(n²)`],
+        [`<span class="text-green-400">${t('tbl.prefill.total')}</span>`, fmtFlops(r.prefillTotalFlops)],
+        [t('tbl.prefill.ai'), `${r.prefillAI.toFixed(0)} FLOPs/Byte (${t('tbl.compute.bound.ok')} ✅)`],
+        [t('tbl.prefill.lat'), formatMs(r.prefillMs) + ` (${r.prefillTPS.toFixed(0)} tok/s)`],
+        [`<span class="text-blue-400">${t('tbl.decode.mem')}</span>`, formatMs(r.decodeMemBoundMs) + '/step'],
+        [`<span class="text-blue-400">${t('tbl.decode.comp')}</span>`, formatMs(r.decodeComputeBoundMs) + '/step'],
+        [t('tbl.decode.bottleneck'), r.decodeBottleneck === 'memory' ? `📦 ${t('tbl.mem.bound')}` : `⚡ ${t('tbl.comp.bound')}`],
+        [t('tbl.decode.ai'), `${r.decodeAI.toFixed(1)} FLOPs/Byte`],
+        [t('tbl.decode.speed'), formatMs(r.decodeTokenMs) + '/tok (' + r.decodeTPS.toFixed(1) + ' tok/s)'],
+        [t('tbl.total.lat'), formatMs(r.totalMs) + ` (${r.totalOutputTPS.toFixed(1)} tok/s output)`],
+        [t('tbl.fits'), r.fitsInMemory ? `✅ ${t('tbl.fits.yes')}` : `❌ ${t('tbl.fits.no')}`],
+        [t('tbl.flash'), r.flashAttn ? `⚡ ${t('tbl.flash.on')}` : `❌ ${t('tbl.flash.off')} (+${formatGB(r.attnScoreMemGB)} attn scores)`],
+    ].map(([k,v]) => `<tr><td class="py-2 text-gray-400 pr-4">${k}</td><td class="py-2 mono text-gray-200">${v}</td></tr>`).join('');
+
+    renderRoofline(r);
+    renderComparison(r);
+    renderScaling(r);
+}
+
+function renderRoofline(r) {
+    const ctx = document.getElementById('roofline-chart').getContext('2d');
+    const tflops = r.effectiveTflops, bwGBs = r.effectiveBW;
+    const xs = [], ys = [];
+    for (let i = -1; i <= 5; i += 0.1) { const ai = Math.pow(10, i); xs.push(ai); ys.push(Math.min(ai * bwGBs / 1e3, tflops)); }
+    const tc = chartThemeColors();
+    if (rooflineChart) rooflineChart.destroy();
+    rooflineChart = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets: [
+            { label: 'Roofline', data: xs.map((x,i)=>({x,y:ys[i]})), showLine: true, borderColor: '#6366f1', backgroundColor: 'transparent', pointRadius: 0, borderWidth: 2 },
+            { label: `Prefill (AI=${r.prefillAI.toFixed(0)})`, data: [{x:r.prefillAI, y:Math.min(r.prefillAI*bwGBs/1e3,tflops)}], pointRadius: 8, pointBackgroundColor: '#22c55e', pointBorderColor: '#fff', pointBorderWidth: 2 },
+            { label: `Decode (AI=${r.decodeAI.toFixed(1)})`, data: [{x:r.decodeAI, y:Math.min(r.decodeAI*bwGBs/1e3,tflops)}], pointRadius: 8, pointBackgroundColor: '#3b82f6', pointBorderColor: '#fff', pointBorderWidth: 2 }
+        ]},
+        options: { responsive: true, maintainAspectRatio: false,
+            scales: { x: { type:'logarithmic', title:{display:true,text:t('chart.ai.label'),color:tc.tick}, ticks:{color:tc.tick}, grid:{color:tc.grid}, min:0.1, max:100000 },
+                      y: { type:'logarithmic', title:{display:true,text:t('chart.perf.label'),color:tc.tick}, ticks:{color:tc.tick}, grid:{color:tc.grid} } },
+            plugins: { legend: { labels: { color:tc.legend, usePointStyle:true } } } }
+    });
+}
+
+function runCalcForDevice(model, dev, quantBits, promptLen, outputLen, batchSize, tp, flashAttn, kvBits) {
+    let tpEff = Math.max(1.0 - TP_COMM_OVERHEAD * Math.max(0, tp-1), 0.5);
+    const rawT = getDeviceTflops(dev, quantBits), effT = rawT*tp*tpEff*COMPUTE_UTIL, effBW = dev.bw*tp*tpEff*BW_UTIL;
+    const mSz = (model.params*quantBits/8)/1e9;
+    const kvGB = calcKVCacheGB(model, promptLen+outputLen, batchSize, quantBits, kvBits);
+    let actGB = (model.hiddenDim*promptLen*batchSize*4*2)/1e9;
+    if (!flashAttn) actGB += (batchSize*model.heads*promptLen*promptLen*4)/1e9;
+    if (mSz+kvGB+actGB > dev.vram*tp) return { decodeTPS:0, fitsInMemory:false };
+    const aB = model.activeParams*quantBits/8;
+    const avg = promptLen+outputLen/2;
+    let kvR = calcKVCacheGB(model, Math.floor(avg), batchSize, quantBits, kvBits)*1e9;
+    if (!flashAttn) kvR += 2*batchSize*model.heads*avg*4*model.layers;
+    const tR = aB+kvR;
+    const mS = tR/(effBW*1e9);
+    const dF = 2*model.activeParams*batchSize + 4*batchSize*model.heads*avg*model.headDim*model.layers;
+    const cS = dF/(effT*1e12);
+    const sS = Math.max(mS, cS);
+    return { decodeTPS: 1000/((sS/batchSize)*1000), fitsInMemory:true };
+}
+
+function renderComparison(r) {
+    const ctx = document.getElementById('compare-chart').getContext('2d');
+    const results = [];
+    for (const [dk,dev] of Object.entries(DEVICES)) {
+        const res = runCalcForDevice(r.model, dev, r.quantBits, r.promptLen, r.outputLen, r.batchSize, r.tp, r.flashAttn, r.kvBits);
+        if (res.fitsInMemory) results.push({ name:dev.name, decodeTPS:res.decodeTPS, key:dk });
+    }
+    results.sort((a,b) => b.decodeTPS - a.decodeTPS);
+    const tc = chartThemeColors();
+    if (compareChart) compareChart.destroy();
+    ctx.canvas.parentElement.style.height = Math.max(300, results.length * 26) + 'px';
+    if (!results.length) { ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height); ctx.fillStyle=tc.tick; ctx.font='14px Inter,system-ui'; ctx.fillText(t('chart.no.vram'),20,80); return; }
+    const cur = DEVICES[r.deviceKey].name;
+    compareChart = new Chart(ctx, {
+        type:'bar',
+        data:{ labels:results.map(r=>r.name), datasets:[{ label:t('chart.decode'), data:results.map(r=>r.decodeTPS),
+            backgroundColor:results.map(r=>r.name===cur?'#6366f1':tc.barBg), borderColor:results.map(r=>r.name===cur?'#818cf8':tc.barBorder), borderWidth:1, borderRadius:4 }] },
+        options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+            scales:{ x:{title:{display:true,text:t('chart.decode.tps'),color:tc.tick},ticks:{color:tc.tick},grid:{color:tc.grid}}, y:{ticks:{color:tc.legend,font:{size:11}},grid:{display:false}} },
+            plugins:{ legend:{display:false} } }
+    });
+}
+
+function renderScaling(r) {
+    const results = calcMultiGPUScaling(r.model, r.device, r.quantBits, r.promptLen, r.outputLen, r.batchSize, r.flashAttn, r.kvBits);
+
+    // Interconnect info
+    const icBW = r.device.interconnectBW || 0;
+    const maxG = r.device.maxGPUs || 1;
+    let icLabel;
+    if (icBW >= 300) icLabel = `${icBW} GB/s (NVLink / xGMI)`;
+    else if (icBW >= 50) icLabel = `${icBW} GB/s (NVLink)`;
+    else if (icBW > 0) icLabel = `${icBW} GB/s (PCIe)`;
+    else icLabel = t('mg.na');
+    document.getElementById('mg-interconnect-info').textContent =
+        `${t('mg.interconnect')}: ${icLabel} | Max: ${maxG}× GPU`;
+
+    // Config label helper (e.g. "1×", "2× TP2", "2× PP2", "4× TP2·PP2")
+    function cfgLabel(c) {
+        if (c.tp === 1 && c.pp === 1) return '1×';
+        const p = [];
+        if (c.tp > 1) p.push('TP' + c.tp);
+        if (c.pp > 1) p.push('PP' + c.pp);
+        return c.numGPUs + '× ' + p.join('·');
+    }
+
+    // Table
+    let prevGPUs = 0;
+    document.getElementById('scaling-table').innerHTML = results.map(res => {
+        const gpuBorder = res.numGPUs !== prevGPUs && prevGPUs > 0 ? ' border-t-2 border-gray-600' : '';
+        prevGPUs = res.numGPUs;
+        if (res.supported === false) return `<tr class="text-gray-600${gpuBorder}"><td class="py-2">${res.numGPUs}×</td><td colspan="5" class="py-2 text-center text-gray-600">${t('mg.unsupported')}</td></tr>`;
+        if (!res.fitsInMemory) return `<tr class="${gpuBorder}"><td class="py-2">${cfgLabel(res)}</td><td colspan="4" class="py-2 text-center text-red-400">${t('mg.oom')}</td><td class="py-2 text-right mono text-red-400">${formatGB(res.memPerGPU)}</td></tr>`;
+        const isCurrent = res.tp === r.tp && res.pp === 1;
+        const hl = isCurrent ? ' text-primary font-semibold' : '';
+        const ppTag = res.pp > 1 ? ' <span class="text-cyan-400 text-xs">PP</span>' : '';
+        return `<tr class="${hl}${gpuBorder}">
+            <td class="py-2">${cfgLabel(res)}${ppTag}</td>
+            <td class="py-2 text-right mono">${res.decodeTPS.toFixed(1)} tok/s</td>
+            <td class="py-2 text-right mono">${formatMs(res.prefillMs)}</td>
+            <td class="py-2 text-right mono">${res.decodeSpeedup !== null ? res.decodeSpeedup.toFixed(2) + '×' : '—'}</td>
+            <td class="py-2 text-right mono">${res.efficiency !== null ? res.efficiency.toFixed(0) + '%' : '—'}</td>
+            <td class="py-2 text-right mono">${formatGB(res.memPerGPU)}</td>
+        </tr>`;
+    }).join('');
+
+    // Chart — bars for all valid configs, ideal line, color-coded TP vs PP
+    const valid = results.filter(v => v.supported !== false && v.fitsInMemory);
+    const base = valid.length > 0 ? valid[0] : null;
+    const tc = chartThemeColors();
+    const ctx = document.getElementById('scaling-chart').getContext('2d');
+    if (scalingChart) scalingChart.destroy();
+    if (!valid.length) { ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height); return; }
+
+    const labels = valid.map(v => cfgLabel(v));
+    const ppCyan = '#06b6d4';
+    const datasets = [{
+        label: t('mg.chart.decode'), data: valid.map(v => v.decodeTPS),
+        backgroundColor: valid.map(v => {
+            if (v.tp === r.tp && v.pp === 1) return '#6366f1';
+            if (v.pp > 1) return ppCyan;
+            return tc.barBg;
+        }),
+        borderColor: valid.map(v => {
+            if (v.tp === r.tp && v.pp === 1) return '#818cf8';
+            if (v.pp > 1) return '#22d3ee';
+            return tc.barBorder;
+        }),
+        borderWidth: 1, borderRadius: 4, yAxisID: 'y', order: 2
+    }];
+    if (base && valid.length > 1) {
+        datasets.push({
+            label: t('mg.chart.ideal'),
+            data: valid.map(v => base.decodeTPS * v.numGPUs / (base.numGPUs || 1)),
+            type: 'line', borderColor: tc.barBorder, borderDash: [5,5],
+            pointRadius: 0, borderWidth: 1.5, yAxisID: 'y', order: 0
+        });
+    }
+
+    scalingChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: t('mg.chart.decode'), color: tc.tick },
+                     ticks: { color: tc.tick }, grid: { color: tc.grid } },
+                x: { ticks: { color: tc.tick, font: { size: 10 } }, grid: { display: false } }
+            },
+            plugins: { legend: { labels: { color: tc.legend, usePointStyle: true } } }
+        }
+    });
+}
+
+function onModelChange() {
+    const m = MODELS[document.getElementById('model-select').value];
+    document.getElementById('model-info').innerHTML = `
+        <div>Params: <span class="text-gray-300">${(m.params/1e9).toFixed(1)}B</span>${m.moe?` (active: ${(m.activeParams/1e9).toFixed(1)}B)`:''}</div>
+        <div>Layers: ${m.layers} | Heads: ${m.heads} (KV: ${m.kvHeads}) | Dim: ${m.hiddenDim}</div>
+        <div>Context: ${(m.maxCtx/1024).toFixed(0)}K ${m.moe?`| MoE: ${m.numExperts} experts top-${m.topK}`:''}</div>
+        ${m.note?`<div class="text-yellow-500">${m.note}</div>`:''}`;
+    calculate();
+}
+function onDeviceChange() {
+    const d = DEVICES[document.getElementById('device-select').value];
+    document.getElementById('device-info').innerHTML = `
+        <div>VRAM: ${d.vram} GB | BW: ${d.bw} GB/s</div>
+        <div>FP16: ${d.fp16Tflops} TFLOPS | FP8: ${d.fp8Tflops} TFLOPS</div>`;
+    calculate();
+}
+
+// Init
+initTheme();
+initLang();
+onModelChange();
+onDeviceChange();
+</script>
+</body>
+</html>

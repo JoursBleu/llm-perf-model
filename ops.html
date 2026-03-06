@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="AWl1KvffncWtkBzHG9EkyPN5bxQRxne9-5xpV5tN_DY" />
+    <title>Per-Op Layer Breakdown — LLM Perf Model</title>
+    <meta name="description" content="Per-operation analysis of a single Transformer layer: FLOPs, memory bytes, arithmetic intensity, compute vs memory bound breakdown.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script>tailwind.config={theme:{extend:{colors:{primary:'#6366f1',dark:'#0f172a',card:'#1e293b',surface:'#334155'}}}}</script>
+    <style>
+        body{font-family:'Inter',system-ui,sans-serif}
+        .mono{font-family:'Fira Code','Consolas',monospace}
+        input[type=range]{-webkit-appearance:none;height:6px;border-radius:3px;background:#334155}
+        input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#6366f1;cursor:pointer}
+        select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;-webkit-appearance:none}
+        .nav-link{transition:all .15s} .nav-link:hover{color:#fff} .nav-active{color:#6366f1;border-bottom:2px solid #6366f1}
+        /* ── Light theme ── */
+        html.light { color-scheme: light; }
+        html.light .bg-dark { background-color: #f8fafc; }
+        html.light .bg-dark\/80 { background-color: rgba(248,250,252,0.85); }
+        html.light .bg-card { background-color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        html.light .bg-surface { background-color: #f1f5f9; }
+        html.light .text-gray-100 { color: #0f172a; }
+        html.light .text-gray-200 { color: #1e293b; }
+        html.light .text-gray-300 { color: #334155; }
+        html.light .text-gray-400 { color: #64748b; }
+        html.light .text-gray-500 { color: #94a3b8; }
+        html.light .border-gray-600, html.light .border-gray-700, html.light .border-gray-800 { border-color: #e2e8f0; }
+        html.light .bg-gray-600 { background-color: #cbd5e1; }
+        html.light .bg-gray-800 { background-color: #e2e8f0; }
+        html.light .divide-gray-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0; }
+        html.light .divide-gray-800\/50 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(226,232,240,0.5); }
+        html.light .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.04); }
+        html.light input[type=range] { background: #cbd5e1; }
+        html.light select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); }
+        html.light .nav-link:hover { color: #0f172a; }
+        html.light .hover\:text-white:hover { color: #0f172a; }
+        html.light .text-green-400 { color: #16a34a; }
+        html.light .text-blue-400 { color: #2563eb; }
+        html.light .text-yellow-400 { color: #ca8a04; }
+        html.light .text-red-400 { color: #dc2626; }
+        html.light .text-purple-400 { color: #9333ea; }
+        html.light .text-cyan-400 { color: #0891b2; }
+        html.light .text-orange-400 { color: #ea580c; }
+        html.light .text-emerald-400 { color: #059669; }
+        html.light .text-sky-400 { color: #0284c7; }
+        html.light .text-amber-400 { color: #d97706; }
+        html.light .text-yellow-500 { color: #a16207; }
+        html.light .from-indigo-900\/30 { --tw-gradient-from: rgba(99,102,241,0.08); }
+        html.light .to-cyan-900\/30 { --tw-gradient-to: rgba(6,182,212,0.08); }
+        html.light .border-indigo-800\/40 { border-color: rgba(99,102,241,0.2); }
+    </style>
+</head>
+<body class="bg-dark text-gray-100 min-h-screen">
+
+<!-- Header -->
+<header class="border-b border-gray-800 bg-dark/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
+        <div class="flex items-center gap-2 text-xl font-bold shrink-0"><span class="text-2xl">⚡</span><span class="text-primary">LLM Perf Model</span></div>
+        <nav class="flex items-center gap-4 text-sm">
+            <a id="nav-index" href="index.html" class="nav-link py-1 text-gray-400">📊 <span data-i18n="nav.overall">Overall</span></a>
+            <a href="ops.html" class="nav-link nav-active py-1 font-medium">🔬 <span data-i18n="nav.ops">Per-Op</span></a>
+            <a id="nav-robot" href="robot.html" class="nav-link py-1 text-gray-400">🤖 <span data-i18n="nav.robot">Bot</span></a>
+        </nav>
+        <div class="ml-auto flex items-center gap-3 text-sm">
+            <select id="lang-select" onchange="onLangChange(this)" class="bg-transparent text-gray-400 hover:text-primary pl-2 pr-5 py-1 rounded-lg hover:bg-surface transition-colors font-medium text-sm cursor-pointer border-none outline-none">
+                <option value="en" class="bg-gray-800 text-white">EN</option>
+                <option value="zh" class="bg-gray-800 text-white">中文</option>
+            </select>
+            <button id="theme-toggle" onclick="cycleTheme()" class="text-gray-400 hover:text-primary px-2 py-1 rounded-lg hover:bg-surface transition-colors flex items-center gap-1" title="Theme">🌗 Auto</button>
+            <a href="https://github.com/JoursBleu/llm-perf-model" target="_blank" class="text-gray-400 hover:text-white flex items-center gap-1">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                GitHub
+            </a>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 py-8">
+    <div class="text-center mb-10">
+        <h1 class="text-3xl md:text-4xl font-bold mb-3" data-i18n="ops.title">Per-Op Layer Breakdown</h1>
+        <p class="text-gray-400 max-w-2xl mx-auto" data-i18n="ops.desc">Per-operation analysis of a single Transformer layer — FLOPs, IO bytes, arithmetic intensity, and bottleneck type.</p>
+    </div>
+
+    <!-- Config Panel (compact) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        <div class="bg-card rounded-xl p-4 border border-gray-800">
+            <label class="text-sm text-gray-400 block mb-1" data-i18n="cfg.model">Model</label>
+            <select id="model-select" onchange="onModelChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8"></select>
+            <div id="model-info" class="text-sm text-gray-500 mt-2"></div>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-gray-800">
+            <label class="text-sm text-gray-400 block mb-1" data-i18n="cfg.device">Device</label>
+            <select id="device-select" onchange="onDeviceChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8"></select>
+            <div id="device-info" class="text-sm text-gray-500 mt-2"></div>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-gray-800 space-y-3">
+            <div>
+                <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.quant">Quantization</span></label>
+                <select id="quant" onchange="renderOps()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-1.5 text-gray-100 text-sm mt-1 pr-8">
+                    <option value="16">FP16 / BF16</option>
+                    <option value="8">INT8 / FP8</option>
+                    <option value="4" selected>INT4 / GPTQ / AWQ</option>
+                    <option value="3">3-bit (GGUF Q3)</option>
+                    <option value="2">2-bit (GGUF Q2)</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.prompt">Prompt Length</span><span id="prompt-val" class="text-primary">512</span></label>
+                <input type="range" id="prompt-len" min="32" max="32768" value="512" step="32" oninput="document.getElementById('prompt-val').textContent=this.value;renderOps()" class="w-full mt-1">
+            </div>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-gray-800 space-y-3">
+            <div>
+                <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.output">Output Length</span><span id="output-val" class="text-primary">256</span></label>
+                <input type="range" id="output-len" min="16" max="8192" value="256" step="16" oninput="document.getElementById('output-val').textContent=this.value;renderOps()" class="w-full mt-1">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.batch">Batch</span><span id="batch-val" class="text-primary">1</span></label>
+                    <input type="range" id="batch-size" min="1" max="128" value="1" step="1" oninput="document.getElementById('batch-val').textContent=this.value;renderOps()" class="w-full mt-1">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span>TP</span><span id="tp-val" class="text-primary">1</span></label>
+                    <input type="range" id="tp-size" min="1" max="8" value="1" step="1" oninput="document.getElementById('tp-val').textContent=this.value;renderOps()" class="w-full mt-1">
+                </div>
+            </div>
+            <div class="flex items-center justify-between">
+                <label class="text-sm text-gray-400" data-i18n="cfg.flash">FlashAttn</label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="flash-attn" checked onchange="renderOps()" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-600 rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phase Toggle + Summary -->
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex gap-2">
+            <button id="op-tab-prefill" onclick="switchTab('prefill')" class="px-4 py-2 rounded-lg text-sm bg-primary text-white font-medium" data-i18n="ops.prefill">Prefill</button>
+            <button id="op-tab-decode" onclick="switchTab('decode')" class="px-4 py-2 rounded-lg text-sm bg-surface text-gray-400 hover:text-white" data-i18n="ops.decode">Decode (1 step)</button>
+        </div>
+        <div id="summary-badge" class="text-sm text-gray-400 mono"></div>
+    </div>
+
+    <!-- Op Table + Chart -->
+    <div class="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-8">
+        <div class="xl:col-span-3 bg-card rounded-xl p-6 border border-gray-800 overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-gray-500 border-b border-gray-700">
+                        <th class="py-2 text-left font-medium" data-i18n="ops.col.op">Operation</th>
+                        <th class="py-2 text-right font-medium" data-i18n="ops.col.flops">FLOPs</th>
+                        <th class="py-2 text-right font-medium" data-i18n="ops.col.bytes">Bytes (R+W)</th>
+                        <th class="py-2 text-right font-medium" data-i18n="ops.col.ai">AI</th>
+                        <th class="py-2 text-right font-medium" data-i18n="ops.col.bound">Bound</th>
+                        <th class="py-2 text-right font-medium" data-i18n="ops.col.time">Time</th>
+                        <th class="py-2 text-right font-medium" data-i18n="ops.col.pct">%</th>
+                    </tr>
+                </thead>
+                <tbody id="op-table-body" class="divide-y divide-gray-800/50"></tbody>
+                <tfoot id="op-table-foot" class="border-t-2 border-gray-600"></tfoot>
+            </table>
+        </div>
+        <div class="xl:col-span-2 bg-card rounded-xl p-6 border border-gray-800">
+            <div style="position:relative;height:400px"><canvas id="op-chart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Category Summary -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div id="cat-attn" class="bg-card rounded-xl p-5 border border-gray-800">
+            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="ops.cat.attn">Attention</div>
+            <div class="text-xl font-bold mono text-emerald-400">—</div>
+            <div class="text-sm text-gray-500 mt-1" data-i18n="ops.cat.attn.sub">Q/K/V Proj + Attn + O Proj</div>
+        </div>
+        <div id="cat-ffn" class="bg-card rounded-xl p-5 border border-gray-800">
+            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="ops.cat.ffn">FFN / MLP</div>
+            <div class="text-xl font-bold mono text-sky-400">—</div>
+            <div class="text-sm text-gray-500 mt-1" data-i18n="ops.cat.ffn.sub">Gate, Up, Down + Activation</div>
+        </div>
+        <div id="cat-norm" class="bg-card rounded-xl p-5 border border-gray-800">
+            <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="ops.cat.norm">Norm + Residual</div>
+            <div class="text-xl font-bold mono text-amber-400">—</div>
+            <div class="text-sm text-gray-500 mt-1" data-i18n="ops.cat.norm.sub">RMSNorm, Residual connections</div>
+        </div>
+    </div>
+
+    <!-- CTA back to overall -->
+    <div class="bg-gradient-to-r from-indigo-900/30 to-cyan-900/30 rounded-xl p-6 border border-indigo-800/40 mb-8 text-center">
+        <p class="text-gray-300 mb-3" data-i18n="cta.index">See overall performance estimates</p>
+        <a id="cta-index" href="index.html" class="inline-block bg-primary hover:bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-medium transition-colors" data-i18n="cta.index.btn">📊 Overall Performance ←</a>
+    </div>
+</main>
+
+<footer class="border-t border-gray-800 py-6 text-center text-gray-500 text-sm">
+    <p data-i18n="footer.ops">LLM Perf Model — Per-operation Roofline analysis runs in your browser. Estimates are theoretical upper bounds.</p>
+</footer>
+
+<script src="shared.js?v=10"></script>
+<script>
+// ── Init ──
+populateModelSelect(document.getElementById('model-select'));
+populateDeviceSelect(document.getElementById('device-select'));
+loadConfigFromURL();
+
+const CAT_COLORS = { attn: '#34d399', ffn: '#38bdf8', norm: '#fbbf24', other: '#6b7280' };
+let opChart = null;
+let currentTab = 'prefill';
+
+function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('op-tab-prefill').className = tab === 'prefill'
+        ? 'px-4 py-2 rounded-lg text-sm bg-primary text-white font-medium'
+        : 'px-4 py-2 rounded-lg text-sm bg-surface text-gray-400 hover:text-white';
+    document.getElementById('op-tab-decode').className = tab === 'decode'
+        ? 'px-4 py-2 rounded-lg text-sm bg-primary text-white font-medium'
+        : 'px-4 py-2 rounded-lg text-sm bg-surface text-gray-400 hover:text-white';
+    renderOps();
+}
+
+function renderOps() {
+    const cfg = readConfig();
+    const { model, device, quantBits, promptLen, outputLen, batchSize, tp, flashAttn,
+            effectiveTflops, effectiveBW } = cfg;
+
+    // Sync nav links
+    const qs = saveConfigToURL();
+    document.getElementById('nav-index').href = 'index.html?' + qs;
+    document.getElementById('cta-index').href = 'index.html?' + qs;
+
+    const tokens = currentTab === 'prefill' ? promptLen : 1;
+    const kvPos = promptLen + Math.floor(outputLen / 2);
+    const ops = computeLayerOps(model, effectiveTflops, effectiveBW, quantBits,
+                                tokens, batchSize, flashAttn, currentTab, kvPos);
+
+    const totalTime = ops.reduce((s, o) => s + o.timeMs, 0);
+    const totalFlops = ops.reduce((s, o) => s + o.flops, 0);
+    const totalBytes = ops.reduce((s, o) => s + o.totalBytes, 0);
+
+    // Summary badge
+    document.getElementById('summary-badge').textContent =
+        t('ops.summary').replace('{0}', formatMs(totalTime)).replace('{1}', model.layers).replace('{2}', formatMs(totalTime * model.layers));
+
+    // Table body
+    document.getElementById('op-table-body').innerHTML = ops.map(op => {
+        const pct = totalTime > 0 ? (op.timeMs / totalTime * 100) : 0;
+        const badge = op.bound === 'compute'
+            ? `<span class="text-green-400">⚡${t('tbl.comp.bound')}</span>`
+            : `<span class="text-blue-400">📦${t('tbl.mem.bound')}</span>`;
+        const cc = CAT_COLORS[op.category] || '#6b7280';
+        return `<tr class="hover:bg-white/5">
+            <td class="py-1.5 pr-2" style="color:${cc}">${op.name}</td>
+            <td class="py-1.5 text-right mono text-gray-300">${fmtFlops(op.flops)}</td>
+            <td class="py-1.5 text-right mono text-gray-300">${fmtBytes(op.totalBytes)}</td>
+            <td class="py-1.5 text-right mono text-gray-300">${op.ai < 10 ? op.ai.toFixed(1) : op.ai.toFixed(0)}</td>
+            <td class="py-1.5 text-right">${badge}</td>
+            <td class="py-1.5 text-right mono text-gray-200">${formatMs(op.timeMs)}</td>
+            <td class="py-1.5 text-right mono text-gray-400">${pct.toFixed(1)}%</td>
+        </tr>`;
+    }).join('');
+
+    // Table footer
+    const allTime = totalTime * model.layers;
+    document.getElementById('op-table-foot').innerHTML = `
+        <tr class="font-semibold text-gray-200">
+            <td class="py-2">${t('ops.single.layer')}</td>
+            <td class="py-2 text-right mono">${fmtFlops(totalFlops)}</td>
+            <td class="py-2 text-right mono">${fmtBytes(totalBytes)}</td>
+            <td class="py-2 text-right mono">${totalBytes > 0 ? (totalFlops / totalBytes).toFixed(1) : '—'}</td>
+            <td></td>
+            <td class="py-2 text-right mono">${formatMs(totalTime)}</td>
+            <td class="py-2 text-right">100%</td>
+        </tr>
+        <tr class="text-gray-400">
+            <td class="py-1.5">${t('ops.n.layers').replace('{0}', model.layers)}</td>
+            <td class="py-1.5 text-right mono">${fmtFlops(totalFlops * model.layers)}</td>
+            <td></td><td></td><td></td>
+            <td class="py-1.5 text-right mono font-semibold text-primary">${formatMs(allTime)}</td>
+            <td></td>
+        </tr>`;
+
+    // Category summary cards
+    const catTime = { attn: 0, ffn: 0, norm: 0 };
+    ops.forEach(op => { if (catTime[op.category] !== undefined) catTime[op.category] += op.timeMs; });
+    for (const [cat, el] of [['attn','cat-attn'],['ffn','cat-ffn'],['norm','cat-norm']]) {
+        const t = catTime[cat];
+        const pct = totalTime > 0 ? (t / totalTime * 100).toFixed(1) : 0;
+        document.getElementById(el).querySelector('.text-xl').textContent = `${formatMs(t)} (${pct}%)`;
+    }
+
+    // Chart
+    const tc = chartThemeColors();
+    const ctx = document.getElementById('op-chart').getContext('2d');
+    if (opChart) opChart.destroy();
+    opChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ops.map(o => o.name),
+            datasets: [{
+                label: t('ops.chart.compute'),
+                data: ops.map(o => o.bound === 'compute' ? o.timeMs : 0),
+                backgroundColor: '#34d399', borderRadius: 3, barPercentage: 0.75
+            }, {
+                label: t('ops.chart.memory'),
+                data: ops.map(o => o.bound === 'memory' ? o.timeMs : 0),
+                backgroundColor: '#60a5fa', borderRadius: 3, barPercentage: 0.75
+            }]
+        },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { stacked: true, title: { display: true, text: t('ops.chart.time'), color: tc.tick }, ticks: { color: tc.tick }, grid: { color: tc.grid } },
+                y: { stacked: true, ticks: { color: tc.legend, font: { size: 10 } }, grid: { display: false } }
+            },
+            plugins: {
+                legend: { position: 'top', labels: { color: tc.legend, boxWidth: 12, padding: 8, font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => ops[items[0].dataIndex].name,
+                        label: (ctx) => {
+                            const op = ops[ctx.dataIndex];
+                            if (ctx.raw === 0) return null;
+                            return [
+                                `Time: ${formatMs(op.timeMs)} (${op.bound}-bound)`,
+                                `AI: ${op.ai < 10 ? op.ai.toFixed(1) : op.ai.toFixed(0)} FLOPs/Byte`,
+                                `FLOPs: ${fmtFlops(op.flops)} | IO: ${fmtBytes(op.totalBytes)}`
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function onModelChange() {
+    const m = MODELS[document.getElementById('model-select').value];
+    document.getElementById('model-info').innerHTML =
+        `${(m.params/1e9).toFixed(1)}B${m.moe?` (active ${(m.activeParams/1e9).toFixed(1)}B)`:''} | ${m.layers}L | ${m.heads}H | ${m.hiddenDim}D${m.moe?` | MoE ${m.numExperts}×top${m.topK}`:''}`;
+    renderOps();
+}
+function onDeviceChange() {
+    const d = DEVICES[document.getElementById('device-select').value];
+    document.getElementById('device-info').innerHTML = `${d.vram}GB | ${d.bw} GB/s | FP16: ${d.fp16Tflops}T`;
+    renderOps();
+}
+
+initTheme();
+initLang();
+onModelChange();
+onDeviceChange();
+</script>
+</body>
+</html>

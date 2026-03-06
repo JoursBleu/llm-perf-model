@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Bot Sizer — LLM Perf Model</title>
+    <meta name="description" content="Evaluate which LLM can run a chatbot (like OpenClaw) smoothly on a given device. Find the right model-device match for your AI assistant.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script>tailwind.config={theme:{extend:{colors:{primary:'#6366f1',dark:'#0f172a',card:'#1e293b',surface:'#334155'}}}}</script>
+    <style>
+        body{font-family:'Inter',system-ui,sans-serif}
+        .mono{font-family:'Fira Code','Consolas',monospace}
+        input[type=range]{-webkit-appearance:none;height:6px;border-radius:3px;background:#334155}
+        input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#6366f1;cursor:pointer}
+        select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;-webkit-appearance:none}
+        .nav-link{transition:all .15s} .nav-link:hover{color:#fff} .nav-active{color:#6366f1;border-bottom:2px solid #6366f1}
+        .grade-a{background:rgba(34,197,94,0.15);color:#4ade80;border-color:rgba(34,197,94,0.3)}
+        .grade-b{background:rgba(234,179,8,0.15);color:#facc15;border-color:rgba(234,179,8,0.3)}
+        .grade-c{background:rgba(239,68,68,0.12);color:#f87171;border-color:rgba(239,68,68,0.3)}
+        .grade-oom{background:rgba(107,114,128,0.12);color:#6b7280;border-color:rgba(107,114,128,0.3)}
+        /* ── Light theme ── */
+        html.light { color-scheme: light; }
+        html.light .bg-dark { background-color: #f8fafc; }
+        html.light .bg-dark\/80 { background-color: rgba(248,250,252,0.85); }
+        html.light .bg-card { background-color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        html.light .bg-surface { background-color: #f1f5f9; }
+        html.light .text-gray-100 { color: #0f172a; }
+        html.light .text-gray-200 { color: #1e293b; }
+        html.light .text-gray-300 { color: #334155; }
+        html.light .text-gray-400 { color: #64748b; }
+        html.light .text-gray-500 { color: #94a3b8; }
+        html.light .border-gray-600, html.light .border-gray-700, html.light .border-gray-800 { border-color: #e2e8f0; }
+        html.light .bg-gray-600 { background-color: #cbd5e1; }
+        html.light .bg-gray-800 { background-color: #e2e8f0; }
+        html.light .divide-gray-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0; }
+        html.light .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.04); }
+        html.light input[type=range] { background: #cbd5e1; }
+        html.light select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); }
+        html.light .nav-link:hover { color: #0f172a; }
+        html.light .hover\:text-white:hover { color: #0f172a; }
+        html.light .grade-a{background:rgba(34,197,94,0.10);color:#16a34a;border-color:rgba(34,197,94,0.2)}
+        html.light .grade-b{background:rgba(234,179,8,0.10);color:#a16207;border-color:rgba(234,179,8,0.2)}
+        html.light .grade-c{background:rgba(239,68,68,0.08);color:#dc2626;border-color:rgba(239,68,68,0.2)}
+        html.light .grade-oom{background:rgba(107,114,128,0.08);color:#94a3b8;border-color:rgba(107,114,128,0.2)}
+        html.light .text-green-400{color:#16a34a} html.light .text-yellow-400{color:#ca8a04}
+        html.light .text-red-400{color:#dc2626} html.light .text-purple-400{color:#9333ea}
+        html.light .text-cyan-400{color:#0891b2} html.light .text-orange-400{color:#ea580c}
+        html.light .from-indigo-900\/30{--tw-gradient-from:rgba(99,102,241,0.08)}
+        html.light .to-cyan-900\/30{--tw-gradient-to:rgba(6,182,212,0.08)}
+        html.light .border-indigo-800\/40{border-color:rgba(99,102,241,0.2)}
+    </style>
+</head>
+<body class="bg-dark text-gray-100 min-h-screen">
+
+<!-- Header -->
+<header class="border-b border-gray-800 bg-dark/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
+        <div class="flex items-center gap-2 text-xl font-bold shrink-0"><span class="text-2xl">⚡</span><span class="text-primary">LLM Perf Model</span></div>
+        <nav class="flex items-center gap-4 text-sm">
+            <a id="nav-index" href="index.html" class="nav-link py-1 text-gray-400">📊 <span data-i18n="nav.overall">Overall</span></a>
+            <a id="nav-ops" href="ops.html" class="nav-link py-1 text-gray-400">🔬 <span data-i18n="nav.ops">Per-Op</span></a>
+            <a href="robot.html" class="nav-link nav-active py-1 font-medium">🤖 <span data-i18n="nav.robot">Bot</span></a>
+        </nav>
+        <div class="ml-auto flex items-center gap-3 text-sm">
+            <select id="lang-select" onchange="onLangChange(this)" class="bg-transparent text-gray-400 hover:text-primary pl-2 pr-5 py-1 rounded-lg hover:bg-surface transition-colors font-medium text-sm cursor-pointer border-none outline-none">
+                <option value="en" class="bg-gray-800 text-white">EN</option>
+                <option value="zh" class="bg-gray-800 text-white">中文</option>
+            </select>
+            <button id="theme-toggle" onclick="cycleTheme()" class="text-gray-400 hover:text-primary px-2 py-1 rounded-lg hover:bg-surface transition-colors flex items-center gap-1" title="Theme">🌗 Auto</button>
+            <a href="https://github.com/JoursBleu/llm-perf-model" target="_blank" class="text-gray-400 hover:text-white flex items-center gap-1">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                GitHub
+            </a>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 py-8">
+    <div class="text-center mb-10">
+        <h1 class="text-3xl md:text-4xl font-bold mb-3" data-i18n="robot.title">🤖 AI Bot Sizer</h1>
+        <p class="text-gray-400 max-w-2xl mx-auto" data-i18n="robot.desc">Can your device run an LLM chatbot (like OpenClaw) smoothly? Select your model and device to find out.</p>
+    </div>
+
+    <!-- ════ Selected Combo Result ════ -->
+    <div id="result-section">
+        <!-- Grade Banner -->
+        <div id="grade-banner" class="rounded-xl p-6 border-2 mb-8 text-center transition-all"></div>
+
+        <!-- Result Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
+                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.ttft">TTFT</div>
+                <div id="res-ttft" class="text-2xl font-bold text-green-400 mono">—</div>
+                <div class="text-xs text-gray-500 mt-1" data-i18n="robot.res.ttft.sub">Time to First Token</div>
+            </div>
+            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
+                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.tps">Decode</div>
+                <div id="res-tps" class="text-2xl font-bold text-blue-400 mono">—</div>
+                <div class="text-xs text-gray-500 mt-1">tokens/sec</div>
+            </div>
+            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
+                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.total">Total</div>
+                <div id="res-total" class="text-2xl font-bold text-yellow-400 mono">—</div>
+                <div class="text-xs text-gray-500 mt-1" data-i18n="robot.res.total.sub">Full response</div>
+            </div>
+            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
+                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.mem">Memory</div>
+                <div id="res-mem" class="text-2xl font-bold text-purple-400 mono">—</div>
+                <div class="text-xs text-gray-500 mt-1" id="res-mem-detail">— / — GB</div>
+            </div>
+            <div class="bg-card rounded-xl p-5 border border-gray-800 text-center">
+                <div class="text-sm text-gray-500 uppercase tracking-wide mb-1" data-i18n="robot.res.conc">Max Conc.</div>
+                <div id="res-conc" class="text-2xl font-bold text-cyan-400 mono">—</div>
+                <div class="text-xs text-gray-500 mt-1" data-i18n="robot.res.conc.sub">conversations</div>
+            </div>
+        </div>
+
+        <!-- Memory Breakdown Bar -->
+        <div class="bg-card rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 class="font-semibold mb-3" data-i18n="robot.mem.title">Memory Breakdown</h3>
+            <div class="flex h-6 rounded-full overflow-hidden bg-gray-800 mb-2">
+                <div id="bar-weights" class="bg-purple-500 transition-all" style="width:0%" title="Weights"></div>
+                <div id="bar-kv" class="bg-blue-500 transition-all" style="width:0%" title="KV Cache"></div>
+                <div id="bar-act" class="bg-green-500 transition-all" style="width:0%" title="Activations"></div>
+                <div id="bar-free" class="bg-gray-700 transition-all" style="width:0%" title="Free"></div>
+            </div>
+            <div class="flex flex-wrap gap-4 text-xs text-gray-400">
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-purple-500 inline-block"></span> <span id="lbl-weights">Weights: — GB</span></span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-500 inline-block"></span> <span id="lbl-kv">KV Cache: — GB</span></span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-500 inline-block"></span> <span id="lbl-act">Activations: — GB</span></span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-gray-700 inline-block"></span> <span id="lbl-free">Free: — GB</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config: Scenario + (Model/Device) + Options -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Scenario Presets + Chat Params -->
+        <div class="bg-card rounded-xl p-6 border border-gray-800">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">💬 <span data-i18n="robot.scenario">Scenario</span></h2>
+            <select id="scenario-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mb-3 pr-8">
+                <option value="custom">Custom</option>
+                <option value="quick">Quick Q&A</option>
+                <option value="chat" selected>Conversation (OpenClaw)</option>
+                <option value="deep">Long Context Chat</option>
+                <option value="code">Code Assistant</option>
+                <option value="docs">Document Analysis / RAG</option>
+            </select>
+            <div id="scenario-info" class="text-sm text-gray-500 mb-3"></div>
+            <div class="space-y-2">
+                <div>
+                    <label class="text-xs text-gray-400 flex justify-between"><span data-i18n="robot.ctx">Context Length</span><span id="ctx-val" class="text-primary mono">20480</span></label>
+                    <input type="range" id="ctx-tokens" min="128" max="131072" value="20480" step="128" oninput="onParamChange(this,'ctx-val')" class="w-full mt-1">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 flex justify-between"><span data-i18n="robot.resp">Response Length</span><span id="resp-val" class="text-primary mono">256</span></label>
+                    <input type="range" id="resp-tokens" min="32" max="4096" value="256" step="32" oninput="onParamChange(this,'resp-val')" class="w-full mt-1">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 flex justify-between"><span data-i18n="robot.concurrent">Concurrent Users</span><span id="conc-val" class="text-primary mono">1</span></label>
+                    <input type="range" id="conc-users" min="1" max="64" value="1" step="1" oninput="onParamChange(this,'conc-val')" class="w-full mt-1">
+                </div>
+            </div>
+        </div>
+        <!-- Model + Device (stacked) -->
+        <div class="space-y-6">
+            <!-- Model Select -->
+            <div class="bg-card rounded-xl p-6 border border-gray-800">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🧠 <span data-i18n="cfg.model">Model</span></h2>
+                <select id="model-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-3 pr-8"></select>
+                <div id="model-info" class="text-sm text-gray-500 space-y-1"></div>
+            </div>
+            <!-- Device Select -->
+            <div class="bg-card rounded-xl p-6 border border-gray-800">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🖥️ <span data-i18n="cfg.device">Device</span></h2>
+                <select id="device-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-3 pr-8"></select>
+                <div id="device-info" class="text-sm text-gray-500 space-y-1"></div>
+            </div>
+        </div>
+        <!-- Options -->
+        <div class="bg-card rounded-xl p-6 border border-gray-800">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🔧 <span data-i18n="robot.options">Options</span></h2>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-sm text-gray-400" data-i18n="cfg.quant">Quantization</label>
+                    <select id="quant" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1 pr-8">
+                        <option value="16">FP16 / BF16</option>
+                        <option value="8">INT8 / FP8</option>
+                        <option value="4" selected>INT4 / GPTQ / AWQ</option>
+                        <option value="3">3-bit (GGUF Q3)</option>
+                        <option value="2">2-bit (GGUF Q2)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400" data-i18n="robot.kv.dtype">KV Cache Precision</label>
+                    <select id="kv-quant" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1 pr-8">
+                        <option value="16">FP16</option>
+                        <option value="8" selected>INT8 / FP8</option>
+                        <option value="4">INT4</option>
+                        <option value="2">INT2</option>
+                    </select>
+                </div>
+                <div class="flex items-center justify-between mt-2">
+                    <label class="text-sm text-gray-400" data-i18n="cfg.flash">FlashAttention</label>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="flash-attn" checked class="sr-only peer">
+                        <div class="w-9 h-5 bg-gray-600 rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                    </label>
+                </div>
+                <div class="pt-2 border-t border-gray-800 text-xs text-gray-500 space-y-1 mt-2">
+                    <div class="flex justify-between"><span data-i18n="robot.reading.speed">Human reading</span><span class="mono">~4-5 tok/s</span></div>
+                    <div class="flex justify-between"><span data-i18n="robot.comfort.speed">Comfortable stream</span><span class="mono">~20-30 tok/s</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════ Compare: All Models on This Device ════ -->
+    <div class="bg-card rounded-xl p-6 border border-gray-800 mb-8">
+        <h3 class="font-semibold text-lg mb-1">📊 <span data-i18n="robot.cmp.models">All Models on This Device</span></h3>
+        <p class="text-sm text-gray-500 mb-4" id="cmp-models-sub"></p>
+        <div class="overflow-x-auto">
+            <table id="cmp-models-table" class="w-full text-sm">
+                <thead id="cmp-models-head"></thead>
+                <tbody id="cmp-models-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ════ Compare: All Devices for This Model ════ -->
+    <div class="bg-card rounded-xl p-6 border border-gray-800 mb-8">
+        <h3 class="font-semibold text-lg mb-1">🖥️ <span data-i18n="robot.cmp.devices">All Devices for This Model</span></h3>
+        <p class="text-sm text-gray-500 mb-4" id="cmp-devices-sub"></p>
+        <div class="overflow-x-auto">
+            <table id="cmp-devices-table" class="w-full text-sm">
+                <thead id="cmp-devices-head"></thead>
+                <tbody id="cmp-devices-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="bg-card rounded-xl p-6 border border-gray-800 mb-8">
+        <h3 class="font-semibold mb-4">📈 <span data-i18n="robot.chart.tps">Decode Speed Comparison</span></h3>
+        <div style="position:relative;height:360px"><canvas id="tps-chart"></canvas></div>
+    </div>
+
+    <!-- Methodology -->
+    <details class="bg-card rounded-xl border border-gray-800 mb-8">
+        <summary class="p-6 cursor-pointer font-semibold hover:text-primary">📐 <span data-i18n="robot.method.title">Methodology</span></summary>
+        <div class="px-6 pb-6 text-sm text-gray-400 space-y-3">
+            <p><strong class="text-gray-200" data-i18n="robot.method.ttft.title">TTFT (Time To First Token):</strong> <span data-i18n="robot.method.ttft.desc">Prefill time — processing the full context in one forward pass. Compute-bound. TTFT = FLOPs / (device_TFLOPS × utilization).</span></p>
+            <p><strong class="text-gray-200" data-i18n="robot.method.tps.title">Decode Speed (TPS):</strong> <span data-i18n="robot.method.tps.desc">Tokens per second during generation. Memory-bandwidth-bound — each token reads all weights + KV cache.</span></p>
+            <p><strong class="text-gray-200" data-i18n="robot.method.mem.title">Memory:</strong> <span data-i18n="robot.method.mem.desc">Model weights + KV cache × concurrent_users + activation memory. Quantization reduces both weights and KV cache.</span></p>
+            <p><strong class="text-gray-200" data-i18n="robot.method.conc.title">Concurrent Users:</strong> <span data-i18n="robot.method.conc.desc">Max conversations = floor((VRAM - weights - activations) / KV_cache_per_user).</span></p>
+            <p><strong class="text-gray-200" data-i18n="robot.method.note.title">Note:</strong> <span data-i18n="robot.method.note.desc">Estimates are theoretical upper bounds. Real performance is typically 60-80% of estimates due to framework overhead.</span></p>
+        </div>
+    </details>
+</main>
+
+<footer class="border-t border-gray-800 py-4 text-center text-sm text-gray-600" data-i18n="robot.footer">
+    LLM Perf Model — AI Bot Sizer. All calculations run in your browser.
+</footer>
+
+<script src="shared.js?v=10"></script>
+<script>
+// ============ SCENARIO PRESETS ============
+const SCENARIOS = {
+    quick:  { ctx: 512,   resp: 128,  conc: 1,  desc_en: 'Quick Q&A: short context, short response.', desc_zh: '快速问答：短上下文、短回复。' },
+    chat:   { ctx: 20480, resp: 256,  conc: 1,  desc_en: 'Multi-turn conversation (e.g. OpenClaw): 20K context, typical reply.', desc_zh: '多轮对话（如 OpenClaw）：20K 上下文，典型回复。' },
+    deep:   { ctx: 8192,  resp: 512,  conc: 1,  desc_en: 'Long context chat: extended history + long response.', desc_zh: '长上下文对话：较长历史 + 长回复。' },
+    code:   { ctx: 4096,  resp: 1024, conc: 1,  desc_en: 'Code assistant: code context, lengthy code reply.', desc_zh: '代码助手：代码上下文，较长代码回复。' },
+    docs:   { ctx: 16384, resp: 256,  conc: 1,  desc_en: 'Document analysis / RAG: very long context, short summary.', desc_zh: '文档分析 / RAG：超长上下文，简洁摘要。' },
+};
+
+function onScenarioChange() {
+    const key = document.getElementById('scenario-select').value;
+    const s = SCENARIOS[key];
+    if (s) {
+        document.getElementById('ctx-tokens').value = s.ctx;
+        document.getElementById('resp-tokens').value = s.resp;
+        document.getElementById('conc-users').value = s.conc;
+        document.getElementById('ctx-val').textContent = s.ctx;
+        document.getElementById('resp-val').textContent = s.resp;
+        document.getElementById('conc-val').textContent = s.conc;
+        const lang = getLang();
+        document.getElementById('scenario-info').textContent = lang === 'zh' ? s.desc_zh : s.desc_en;
+    } else {
+        document.getElementById('scenario-info').textContent = '';
+    }
+    evaluate();
+}
+
+function onParamChange(el, labelId) {
+    document.getElementById(labelId).textContent = el.value;
+    document.getElementById('scenario-select').value = 'custom';
+    document.getElementById('scenario-info').textContent = '';
+    evaluate();
+}
+
+function onQuantChange() {
+    // Auto-suggest KV cache precision based on weight quantization
+    const q = parseInt(document.getElementById('quant').value);
+    const kvSel = document.getElementById('kv-quant');
+    if (q >= 16) kvSel.value = '16';
+    else if (q >= 8) kvSel.value = '8';
+    else kvSel.value = '8';
+    evaluate();
+}
+
+// ============ CORE EVALUATION ============
+function evalBot(model, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits) {
+    const totalSeq = ctxTokens + respTokens;
+    const modelSizeGB = calcModelSizeGB(model, quantBits);
+    const kvPerUserGB = calcKVCacheGB(model, totalSeq, 1, quantBits, kvBits);
+    const H = model.hiddenDim;
+    const actMemGB = (H * ctxTokens * 1 * 4 * 2) / 1e9;
+    const totalMemGB = modelSizeGB + kvPerUserGB * concUsers + actMemGB;
+
+    const baseGB = modelSizeGB + actMemGB;
+    const maxConc = kvPerUserGB > 0 ? Math.max(0, Math.floor((device.vram - baseGB) / kvPerUserGB)) : 0;
+
+    if (totalMemGB > device.vram) {
+        return { oom: true, memGB: totalMemGB, maxConc, kvPerUserGB, modelSizeGB, actMemGB };
+    }
+
+    const rawTflops = getDeviceTflops(device, quantBits);
+
+    // TTFT
+    const pfLinear = 2 * model.activeParams * ctxTokens * 1;
+    const pfAttn = calcAttentionFlopsPrefill(model, ctxTokens, 1);
+    let pfComputeS;
+    if (flashAttn) {
+        pfComputeS = (pfLinear + pfAttn) / (rawTflops * COMPUTE_UTIL * 1e12);
+    } else {
+        pfComputeS = pfLinear / (rawTflops * COMPUTE_UTIL * 1e12)
+                   + pfAttn / (rawTflops * COMPUTE_UTIL * 1e12 * (0.40 / COMPUTE_UTIL));
+    }
+    const ttftMs = pfComputeS * 1000;
+
+    // Decode
+    const activeBytes = model.activeParams * quantBits / 8;
+    const avgPos = ctxTokens + respTokens / 2;
+    let kvRead = calcKVCacheGB(model, Math.floor(avgPos), 1, quantBits, kvBits) * 1e9;
+    if (!flashAttn) kvRead += 2 * 1 * model.heads * avgPos * 4 * model.layers;
+    const totalRead = activeBytes + kvRead;
+    const decMemS = totalRead / (device.bw * BW_UTIL * 1e9);
+    const decFlops = 2 * model.activeParams * 1 + calcAttentionFlopsDecodeStep(model, avgPos, 1);
+    const decCompS = decFlops / (rawTflops * COMPUTE_UTIL * 1e12);
+    const decStepMs = Math.max(decMemS, decCompS) * 1000;
+    const tps = 1000 / decStepMs;
+
+    const totalDecMs = decStepMs * respTokens;
+    const totalMs = ttftMs + totalDecMs;
+
+    return {
+        oom: false, memGB: totalMemGB,
+        ttftMs, tps, decStepMs, totalDecMs, totalMs,
+        maxConc, kvPerUserGB, modelSizeGB, actMemGB
+    };
+}
+
+function fmtTime(ms) {
+    if (ms < 1) return ms.toFixed(2) + ' ms';
+    if (ms < 1000) return ms.toFixed(1) + ' ms';
+    return (ms / 1000).toFixed(2) + ' s';
+}
+
+function grade(r) {
+    if (r.oom) return 'oom';
+    if (r.tps >= 20 && r.ttftMs <= 2000) return 'a';
+    if (r.tps >= 5 && r.ttftMs <= 5000) return 'b';
+    return 'c';
+}
+
+function gradeLabel(g) {
+    const lang = getLang();
+    const labels = {
+        a: lang === 'zh' ? '✅ 流畅体验' : '✅ Smooth Experience',
+        b: lang === 'zh' ? '⚠️ 勉强可用' : '⚠️ Usable but Slow',
+        c: lang === 'zh' ? '❌ 太慢了' : '❌ Too Slow',
+        oom: lang === 'zh' ? '💀 显存不足' : '💀 Out of Memory',
+    };
+    return labels[g] || '';
+}
+
+function gradeDesc(r) {
+    const lang = getLang();
+    if (r.oom) {
+        return lang === 'zh'
+            ? `需要 ${r.memGB.toFixed(1)} GB，但设备只有 ${r._vram} GB。最多支持 ${r.maxConc} 个并发会话。`
+            : `Needs ${r.memGB.toFixed(1)} GB, device has ${r._vram} GB. Max ${r.maxConc} concurrent conversations.`;
+    }
+    return lang === 'zh'
+        ? `首 Token ${fmtTime(r.ttftMs)} · 解码 ${r.tps.toFixed(1)} tok/s · 完整回复 ${fmtTime(r.totalMs)} · 显存 ${r.memGB.toFixed(1)} GB · 最多 ${r.maxConc} 并发`
+        : `TTFT ${fmtTime(r.ttftMs)} · Decode ${r.tps.toFixed(1)} tok/s · Full reply ${fmtTime(r.totalMs)} · Memory ${r.memGB.toFixed(1)} GB · Max ${r.maxConc} concurrent`;
+}
+
+// ============ RENDER ============
+let tpsChart = null;
+
+function evaluate() {
+  try {
+    const modelKey = document.getElementById('model-select').value;
+    const deviceKey = document.getElementById('device-select').value;
+    const model = MODELS[modelKey];
+    const device = DEVICES[deviceKey];
+    if (!model || !device) return;
+
+    const quantBits = parseInt(document.getElementById('quant').value);
+    const kvBits = parseInt(document.getElementById('kv-quant').value);
+    const ctxTokens = parseInt(document.getElementById('ctx-tokens').value);
+    const respTokens = parseInt(document.getElementById('resp-tokens').value);
+    const concUsers = parseInt(document.getElementById('conc-users').value);
+    const flashAttn = document.getElementById('flash-attn').checked;
+
+    // Show model & device info
+    const moeTag = model.moe ? ` (MoE ${model.numExperts}×top${model.topK})` : '';
+    const kvLabel = {16:'FP16',8:'INT8/FP8',4:'INT4',2:'INT2'}[kvBits] || kvBits+'bit';
+    document.getElementById('model-info').innerHTML =
+        `<div>${(model.params/1e9).toFixed(1)}B params${moeTag}</div>` +
+        `<div>${model.layers}L · ${model.heads}H · dim ${model.hiddenDim}</div>`;
+    document.getElementById('device-info').innerHTML =
+        `<div>${device.vram} GB · ${device.bw} GB/s</div>` +
+        `<div>${getDeviceTflops(device, quantBits)} TFLOPS (${quantBits <= 8 ? 'INT8' : 'FP16'})</div>` +
+        `<div>KV cache: ${kvLabel}</div>`;
+
+    // Evaluate selected combo
+    const r = evalBot(model, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits);
+    r._vram = device.vram;
+
+    // Grade banner
+    const g = grade(r);
+    const banner = document.getElementById('grade-banner');
+    banner.className = 'rounded-xl p-6 border-2 mb-8 text-center transition-all grade-' + g;
+    banner.innerHTML = `<div class="text-2xl font-bold mb-2">${gradeLabel(g)}</div>
+        <div class="text-sm opacity-80">${gradeDesc(r)}</div>`;
+
+    // Result cards
+    if (r.oom) {
+        document.getElementById('res-ttft').textContent = '—';
+        document.getElementById('res-tps').textContent = '—';
+        document.getElementById('res-total').textContent = '—';
+        document.getElementById('res-mem').textContent = 'OOM';
+        document.getElementById('res-mem').className = 'text-2xl font-bold text-red-400 mono';
+        document.getElementById('res-mem-detail').textContent = r.memGB.toFixed(1) + ' / ' + device.vram + ' GB';
+        document.getElementById('res-conc').textContent = r.maxConc;
+    } else {
+        document.getElementById('res-ttft').textContent = fmtTime(r.ttftMs);
+        document.getElementById('res-ttft').className = 'text-2xl font-bold mono ' + (r.ttftMs <= 2000 ? 'text-green-400' : r.ttftMs <= 5000 ? 'text-yellow-400' : 'text-red-400');
+        document.getElementById('res-tps').textContent = r.tps.toFixed(1);
+        document.getElementById('res-tps').className = 'text-2xl font-bold mono ' + (r.tps >= 20 ? 'text-green-400' : r.tps >= 5 ? 'text-yellow-400' : 'text-red-400');
+        document.getElementById('res-total').textContent = fmtTime(r.totalMs);
+        document.getElementById('res-mem').textContent = r.memGB.toFixed(1) + ' GB';
+        document.getElementById('res-mem').className = 'text-2xl font-bold text-purple-400 mono';
+        document.getElementById('res-mem-detail').textContent = r.memGB.toFixed(1) + ' / ' + device.vram + ' GB';
+        document.getElementById('res-conc').textContent = r.maxConc;
+    }
+
+    // Memory bar
+    const vram = device.vram;
+    const wPct = Math.min(r.modelSizeGB / vram * 100, 100);
+    const kvPct = Math.min(r.kvPerUserGB * concUsers / vram * 100, 100 - wPct);
+    const aPct = Math.min((r.actMemGB || 0) / vram * 100, 100 - wPct - kvPct);
+    const fPct = Math.max(0, 100 - wPct - kvPct - aPct);
+    document.getElementById('bar-weights').style.width = wPct + '%';
+    document.getElementById('bar-kv').style.width = kvPct + '%';
+    document.getElementById('bar-act').style.width = aPct + '%';
+    document.getElementById('bar-free').style.width = fPct + '%';
+    document.getElementById('lbl-weights').textContent = (getLang() === 'zh' ? '权重: ' : 'Weights: ') + r.modelSizeGB.toFixed(1) + ' GB';
+    document.getElementById('lbl-kv').textContent = 'KV Cache: ' + (r.kvPerUserGB * concUsers).toFixed(1) + ' GB';
+    document.getElementById('lbl-act').textContent = (getLang() === 'zh' ? '激活: ' : 'Activations: ') + (r.actMemGB || 0).toFixed(1) + ' GB';
+    document.getElementById('lbl-free').textContent = (getLang() === 'zh' ? '剩余: ' : 'Free: ') + Math.max(0, vram - (r.oom ? 0 : r.memGB)).toFixed(1) + ' GB';
+
+    // ── Compare: All models on this device ──
+    renderModelsTable(device, deviceKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, modelKey, kvBits);
+
+    // ── Compare: All devices for this model ──
+    renderDevicesTable(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, deviceKey, kvBits);
+
+    // ── Chart ──
+    renderTPSChart(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits);
+  } catch (err) {
+    console.error('evaluate() error:', err);
+    const banner = document.getElementById('grade-banner');
+    if (banner) banner.innerHTML = `<div class="text-red-400 font-bold">⚠️ Error: ${err.message}</div>`;
+  }
+}
+
+window.evaluate = evaluate;
+
+function renderModelsTable(device, deviceKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, selectedModelKey, kvBits) {
+    const shortDevName = device.name.replace('NVIDIA ','').replace('AMD ','').replace('GeForce ','');
+    document.getElementById('cmp-models-sub').textContent =
+        (getLang() === 'zh' ? '在 ' : 'On ') + shortDevName +
+        (getLang() === 'zh' ? ' 上，哪些模型能流畅运行？' : ' — which models run smoothly?');
+
+    const modelKeys = Object.keys(MODELS);
+    let headHTML = `<tr class="text-gray-500 border-b border-gray-700 text-xs">
+        <th class="py-2 px-2 text-left font-medium">${t('tbl.model')}</th>
+        <th class="py-2 px-2 text-center font-medium">TTFT</th>
+        <th class="py-2 px-2 text-center font-medium">tok/s</th>
+        <th class="py-2 px-2 text-center font-medium">${getLang()==='zh'?'总时间':'Total'}</th>
+        <th class="py-2 px-2 text-center font-medium">${getLang()==='zh'?'显存':'Mem'}</th>
+        <th class="py-2 px-2 text-center font-medium">${getLang()==='zh'?'并发':'Conc.'}</th>
+        <th class="py-2 px-2 text-center font-medium">${getLang()==='zh'?'评级':'Grade'}</th>
+    </tr>`;
+    document.getElementById('cmp-models-head').innerHTML = headHTML;
+
+    let bodyHTML = '';
+    for (const mk of modelKeys) {
+        const m = MODELS[mk];
+        const r = evalBot(m, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits);
+        r._vram = device.vram;
+        const g = grade(r);
+        const isSelected = mk === selectedModelKey;
+        const rowCls = isSelected ? 'bg-primary/10 font-semibold' : 'hover:bg-white/5';
+
+        if (r.oom) {
+            bodyHTML += `<tr class="border-b border-gray-800/50 ${rowCls}">
+                <td class="py-1.5 px-2 text-xs">${m.name}</td>
+                <td class="py-1.5 px-2 text-center text-gray-600" colspan="4">OOM (${r.memGB.toFixed(1)} GB)</td>
+                <td class="py-1.5 px-2 text-center text-gray-600">${r.maxConc}</td>
+                <td class="py-1.5 px-2 text-center grade-oom rounded px-1">💀</td>
+            </tr>`;
+        } else {
+            const gCls = 'grade-' + g;
+            bodyHTML += `<tr class="border-b border-gray-800/50 ${rowCls}">
+                <td class="py-1.5 px-2 text-xs whitespace-nowrap">${m.name}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${fmtTime(r.ttftMs)}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${r.tps.toFixed(1)}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${fmtTime(r.totalMs)}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${r.memGB.toFixed(1)}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${r.maxConc}</td>
+                <td class="py-1.5 px-2 text-center ${gCls} rounded px-1 text-xs">${g==='a'?'✅':g==='b'?'⚠️':'❌'}</td>
+            </tr>`;
+        }
+    }
+    document.getElementById('cmp-models-body').innerHTML = bodyHTML;
+}
+
+function renderDevicesTable(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, selectedDeviceKey, kvBits) {
+    document.getElementById('cmp-devices-sub').textContent =
+        (getLang() === 'zh' ? '运行 ' : 'Running ') + model.name +
+        (getLang() === 'zh' ? '，哪些设备够用？' : ' — which devices are sufficient?');
+
+    const deviceKeys = Object.keys(DEVICES);
+    let headHTML = `<tr class="text-gray-500 border-b border-gray-700 text-xs">
+        <th class="py-2 px-2 text-left font-medium">${t('tbl.device')}</th>
+        <th class="py-2 px-2 text-center font-medium">VRAM</th>
+        <th class="py-2 px-2 text-center font-medium">TTFT</th>
+        <th class="py-2 px-2 text-center font-medium">tok/s</th>
+        <th class="py-2 px-2 text-center font-medium">${getLang()==='zh'?'总时间':'Total'}</th>
+        <th class="py-2 px-2 text-center font-medium">${getLang()==='zh'?'并发':'Conc.'}</th>
+        <th class="py-2 px-2 text-center font-medium">${getLang()==='zh'?'评级':'Grade'}</th>
+    </tr>`;
+    document.getElementById('cmp-devices-head').innerHTML = headHTML;
+
+    let bodyHTML = '';
+    for (const dk of deviceKeys) {
+        const d = DEVICES[dk];
+        const r = evalBot(model, d, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits);
+        r._vram = d.vram;
+        const g = grade(r);
+        const isSelected = dk === selectedDeviceKey;
+        const rowCls = isSelected ? 'bg-primary/10 font-semibold' : 'hover:bg-white/5';
+        const shortName = d.name.replace('NVIDIA ','').replace('AMD ','').replace('GeForce ','');
+
+        if (r.oom) {
+            bodyHTML += `<tr class="border-b border-gray-800/50 ${rowCls}">
+                <td class="py-1.5 px-2 text-xs whitespace-nowrap">${shortName}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${d.vram}</td>
+                <td class="py-1.5 px-2 text-center text-gray-600" colspan="3">OOM</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${r.maxConc}</td>
+                <td class="py-1.5 px-2 text-center grade-oom rounded px-1">💀</td>
+            </tr>`;
+        } else {
+            const gCls = 'grade-' + g;
+            bodyHTML += `<tr class="border-b border-gray-800/50 ${rowCls}">
+                <td class="py-1.5 px-2 text-xs whitespace-nowrap">${shortName}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${d.vram}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${fmtTime(r.ttftMs)}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${r.tps.toFixed(1)}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${fmtTime(r.totalMs)}</td>
+                <td class="py-1.5 px-2 text-center mono text-xs">${r.maxConc}</td>
+                <td class="py-1.5 px-2 text-center ${gCls} rounded px-1 text-xs">${g==='a'?'✅':g==='b'?'⚠️':'❌'}</td>
+            </tr>`;
+        }
+    }
+    document.getElementById('cmp-devices-body').innerHTML = bodyHTML;
+}
+
+function renderTPSChart(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits) {
+    const ctx = document.getElementById('tps-chart').getContext('2d');
+    const tc = chartThemeColors();
+    const deviceKeys = Object.keys(DEVICES);
+
+    const labels = [];
+    const data = [];
+    const bgColors = [];
+    const borderColors = [];
+
+    for (const dk of deviceKeys) {
+        const d = DEVICES[dk];
+        const r = evalBot(model, d, quantBits, ctxTokens, respTokens, 1, flashAttn, kvBits);
+        const shortName = d.name.replace('NVIDIA ','').replace('AMD ','').replace('GeForce ','');
+        labels.push(shortName);
+        data.push(r.oom ? 0 : r.tps);
+        const g = grade(r);
+        const c = g === 'a' ? '#22c55e' : g === 'b' ? '#eab308' : g === 'c' ? '#ef4444' : '#6b7280';
+        bgColors.push(c + '80');
+        borderColors.push(c);
+    }
+
+    if (tpsChart) tpsChart.destroy();
+    tpsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: model.name + ' — tok/s',
+                data,
+                backgroundColor: bgColors,
+                borderColor: borderColors,
+                borderWidth: 1,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'tokens / sec', color: tc.tick },
+                    ticks: { color: tc.tick },
+                    grid: { color: tc.grid },
+                    beginAtZero: true,
+                },
+                y: {
+                    ticks: { color: tc.tick, font: { size: 10 } },
+                    grid: { color: tc.grid },
+                }
+            }
+        },
+        plugins: [{
+            id: 'targetLines',
+            afterDraw(chart) {
+                const xScale = chart.scales.x;
+                const c = chart.ctx;
+                // 20 tok/s line
+                const x20 = xScale.getPixelForValue(20);
+                if (x20 >= chart.chartArea.left && x20 <= chart.chartArea.right) {
+                    c.save();
+                    c.beginPath();
+                    c.strokeStyle = '#22c55e';
+                    c.lineWidth = 2;
+                    c.setLineDash([6, 4]);
+                    c.moveTo(x20, chart.chartArea.top);
+                    c.lineTo(x20, chart.chartArea.bottom);
+                    c.stroke();
+                    c.fillStyle = '#22c55e';
+                    c.font = '10px sans-serif';
+                    c.fillText('20 tok/s', x20 + 4, chart.chartArea.top + 12);
+                    c.restore();
+                }
+                // 5 tok/s line
+                const x5 = xScale.getPixelForValue(5);
+                if (x5 >= chart.chartArea.left && x5 <= chart.chartArea.right) {
+                    c.save();
+                    c.beginPath();
+                    c.strokeStyle = '#eab308';
+                    c.lineWidth = 1.5;
+                    c.setLineDash([4, 4]);
+                    c.moveTo(x5, chart.chartArea.top);
+                    c.lineTo(x5, chart.chartArea.bottom);
+                    c.stroke();
+                    c.fillStyle = '#eab308';
+                    c.font = '10px sans-serif';
+                    c.fillText('5 tok/s', x5 + 4, chart.chartArea.top + 24);
+                    c.restore();
+                }
+            }
+        }]
+    });
+}
+
+// ============ INIT ============
+function initRobotPage() {
+    const modelSel = document.getElementById('model-select');
+    const deviceSel = document.getElementById('device-select');
+    const scenarioSel = document.getElementById('scenario-select');
+    const quantSel = document.getElementById('quant');
+    const kvQuantSel = document.getElementById('kv-quant');
+    const flashAttnEl = document.getElementById('flash-attn');
+
+    populateModelSelect(modelSel);
+    populateDeviceSelect(deviceSel);
+
+    modelSel.addEventListener('change', evaluate);
+    modelSel.addEventListener('input', evaluate);
+    deviceSel.addEventListener('change', evaluate);
+    deviceSel.addEventListener('input', evaluate);
+    scenarioSel.addEventListener('change', onScenarioChange);
+    quantSel.addEventListener('change', onQuantChange);
+    kvQuantSel.addEventListener('change', evaluate);
+    flashAttnEl.addEventListener('change', evaluate);
+    // Default to a common consumer card
+    const ds = deviceSel;
+    if (DEVICES['rtx-4070']) ds.value = 'rtx-4070';
+    // Default to a popular model
+    const ms = modelSel;
+    if (MODELS['qwen3-8b']) ms.value = 'qwen3-8b';
+
+    initTheme();
+    initLang();
+    onScenarioChange();
+}
+
+document.addEventListener('DOMContentLoaded', initRobotPage);
+</script>
+</body>
+</html>
