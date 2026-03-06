@@ -105,49 +105,56 @@
         <!-- Parameters -->
         <div class="bg-card rounded-xl p-6 border border-gray-800">
             <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">⚙️ <span data-i18n="cfg.params">Parameters</span></h2>
-            <div class="space-y-4">
-                <div>
-                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.quant">Quantization</span></label>
-                    <select id="quant" onchange="onQuantChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1 pr-8">
-                        <option value="16">FP16 / BF16</option>
-                        <option value="8">INT8 / FP8</option>
-                        <option value="4" selected>INT4 / GPTQ / AWQ</option>
-                        <option value="3">3-bit (GGUF Q3)</option>
-                        <option value="2">2-bit (GGUF Q2)</option>
-                    </select>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <div class="text-xs uppercase tracking-wide text-gray-500" data-i18n="cfg.quant">Quantization</div>
+                    <div>
+                        <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.quant">Quantization</span></label>
+                        <select id="quant" onchange="onQuantChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1 pr-8">
+                            <option value="16">FP16 / BF16</option>
+                            <option value="8">INT8 / FP8</option>
+                            <option value="4" selected>INT4 / GPTQ / AWQ</option>
+                            <option value="3">3-bit (GGUF Q3)</option>
+                            <option value="2">2-bit (GGUF Q2)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="robot.kv.dtype">KV Cache Precision</span></label>
+                        <select id="kv-quant" onchange="calculate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1 pr-8">
+                            <option value="16">FP16</option>
+                            <option value="8" selected>INT8 / FP8</option>
+                            <option value="4">INT4</option>
+                            <option value="2">INT2</option>
+                        </select>
+                    </div>
                 </div>
-                <div>
-                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="robot.kv.dtype">KV Cache Precision</span></label>
-                    <select id="kv-quant" onchange="calculate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1 pr-8">
-                        <option value="16">FP16</option>
-                        <option value="8" selected>INT8 / FP8</option>
-                        <option value="4">INT4</option>
-                        <option value="2">INT2</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.prompt">Prompt Length (prefill)</span><span id="prompt-val" class="text-primary">512</span></label>
-                    <input type="range" id="prompt-len" min="32" max="32768" value="512" step="32" oninput="document.getElementById('prompt-val').textContent=this.value;calculate()" class="w-full mt-1">
-                </div>
-                <div>
-                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.output">Output Length (decode)</span><span id="output-val" class="text-primary">256</span></label>
-                    <input type="range" id="output-len" min="16" max="8192" value="256" step="16" oninput="document.getElementById('output-val').textContent=this.value;calculate()" class="w-full mt-1">
-                </div>
-                <div>
-                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.batch">Batch Size</span><span id="batch-val" class="text-primary">1</span></label>
-                    <input type="range" id="batch-size" min="1" max="128" value="1" step="1" oninput="document.getElementById('batch-val').textContent=this.value;calculate()" class="w-full mt-1">
-                </div>
-                <div>
-                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.tp">Tensor Parallel (GPUs)</span><span id="tp-val" class="text-primary">1</span></label>
-                    <input type="range" id="tp-size" min="1" max="8" value="1" step="1" oninput="document.getElementById('tp-val').textContent=this.value;calculate()" class="w-full mt-1">
-                </div>
-                <div class="flex items-center justify-between">
-                    <label class="text-sm text-gray-400" data-i18n="cfg.flash">FlashAttention</label>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="flash-attn" checked onchange="calculate()" class="sr-only peer">
-                        <div class="w-9 h-5 bg-gray-600 rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                        <span class="ml-2 text-sm text-gray-500" data-i18n="cfg.flash.note">IO-aware tiling</span>
-                    </label>
+
+                <div class="space-y-4">
+                    <div class="text-xs uppercase tracking-wide text-gray-500" data-i18n="cfg.params">Parameters</div>
+                    <div>
+                        <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.prompt">Prompt Length (prefill)</span><span id="prompt-val" class="text-primary">512</span></label>
+                        <input type="range" id="prompt-len" min="32" max="32768" value="512" step="32" oninput="document.getElementById('prompt-val').textContent=this.value;calculate()" class="w-full mt-1">
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.output">Output Length (decode)</span><span id="output-val" class="text-primary">256</span></label>
+                        <input type="range" id="output-len" min="16" max="8192" value="256" step="16" oninput="document.getElementById('output-val').textContent=this.value;calculate()" class="w-full mt-1">
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.batch">Batch Size</span><span id="batch-val" class="text-primary">1</span></label>
+                        <input type="range" id="batch-size" min="1" max="128" value="1" step="1" oninput="document.getElementById('batch-val').textContent=this.value;calculate()" class="w-full mt-1">
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.tp">Tensor Parallel (GPUs)</span><span id="tp-val" class="text-primary">1</span></label>
+                        <input type="range" id="tp-size" min="1" max="8" value="1" step="1" oninput="document.getElementById('tp-val').textContent=this.value;calculate()" class="w-full mt-1">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <label class="text-sm text-gray-400" data-i18n="cfg.flash">FlashAttention</label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="flash-attn" checked onchange="calculate()" class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-600 rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                            <span class="ml-2 text-sm text-gray-500" data-i18n="cfg.flash.note">IO-aware tiling</span>
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
