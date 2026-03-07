@@ -401,6 +401,14 @@ function populateModelSelect(selectEl) {
 
 // Vendor → device groups mapping
 const VENDOR_DEVICE_GROUPS = {
+    'amd': {
+        label: 'AMD',
+        groups: {
+            'Consumer / Pro': ['rx-9700xt','rx-9070xt','rx-7900xtx','ai-pro-r9700','w7900'],
+            'APU': ['strix-halo'],
+            'Data Center': ['mi300x','mi250x'],
+        }
+    },
     'nvidia': {
         label: 'NVIDIA',
         groups: {
@@ -409,14 +417,6 @@ const VENDOR_DEVICE_GROUPS = {
             'GeForce RTX 30': ['rtx-3090','rtx-3080ti','rtx-3080','rtx-3070ti','rtx-3070','rtx-3060ti','rtx-3060'],
             'Edge / Arm': ['dgx-spark'],
             'Data Center': ['h200-sxm','h100-sxm','a100-sxm-80','a100-sxm-40','l40s'],
-        }
-    },
-    'amd': {
-        label: 'AMD',
-        groups: {
-            'Consumer / Pro': ['rx-9700xt','rx-9070xt','rx-7900xtx','ai-pro-r9700','w7900'],
-            'APU': ['strix-halo'],
-            'Data Center': ['mi300x','mi250x'],
         }
     },
     'apple': {
