@@ -399,20 +399,49 @@ function populateModelSelect(selectEl) {
     }
 }
 
-function populateDeviceSelect(selectEl) {
-    const groups = {
-        'NVIDIA Data Center': ['h200-sxm','h100-sxm','a100-sxm-80','a100-sxm-40','l40s'],
-        'NVIDIA GeForce RTX 50': ['rtx-5090','rtx-5080','rtx-5070ti','rtx-5070'],
-        'NVIDIA GeForce RTX 40': ['rtx-4090','rtx-4080s','rtx-4080','rtx-4070tis','rtx-4070ti','rtx-4070s','rtx-4070','rtx-4060ti-16','rtx-4060ti','rtx-4060'],
-        'NVIDIA GeForce RTX 30': ['rtx-3090','rtx-3080ti','rtx-3080','rtx-3070ti','rtx-3070','rtx-3060ti','rtx-3060'],
-        'NVIDIA Edge': ['dgx-spark'],
-        'AMD Data Center': ['mi300x','mi250x'],
-        'AMD Consumer / Pro': ['w7900','ai-pro-r9700','rx-9700xt','rx-9070xt','rx-7900xtx'],
-        'AMD APU': ['strix-halo'],
-        'Apple Silicon': ['m4-max','m4-pro','m2-ultra'],
-    };
-    selectEl.innerHTML = '';
-    for (const [g, keys] of Object.entries(groups)) {
+// Vendor → device groups mapping
+const VENDOR_DEVICE_GROUPS = {
+    'nvidia': {
+        label: 'NVIDIA',
+        groups: {
+            'Data Center': ['h200-sxm','h100-sxm','a100-sxm-80','a100-sxm-40','l40s'],
+            'GeForce RTX 50': ['rtx-5090','rtx-5080','rtx-5070ti','rtx-5070'],
+            'GeForce RTX 40': ['rtx-4090','rtx-4080s','rtx-4080','rtx-4070tis','rtx-4070ti','rtx-4070s','rtx-4070','rtx-4060ti-16','rtx-4060ti','rtx-4060'],
+            'GeForce RTX 30': ['rtx-3090','rtx-3080ti','rtx-3080','rtx-3070ti','rtx-3070','rtx-3060ti','rtx-3060'],
+            'Edge / Arm': ['dgx-spark'],
+        }
+    },
+    'amd': {
+        label: 'AMD',
+        groups: {
+            'Data Center': ['mi300x','mi250x'],
+            'Consumer / Pro': ['w7900','ai-pro-r9700','rx-9700xt','rx-9070xt','rx-7900xtx'],
+            'APU': ['strix-halo'],
+        }
+    },
+    'apple': {
+        label: 'Apple',
+        groups: {
+            'Apple Silicon': ['m4-max','m4-pro','m2-ultra'],
+        }
+    },
+};
+
+function populateVendorSelect(vendorEl) {
+    vendorEl.innerHTML = '';
+    for (const [vk, v] of Object.entries(VENDOR_DEVICE_GROUPS)) {
+        const opt = document.createElement('option');
+        opt.value = vk;
+        opt.textContent = v.label;
+        vendorEl.appendChild(opt);
+    }
+}
+
+function populateDeviceSelectByVendor(deviceEl, vendor) {
+    const vg = VENDOR_DEVICE_GROUPS[vendor];
+    if (!vg) return;
+    deviceEl.innerHTML = '';
+    for (const [g, keys] of Object.entries(vg.groups)) {
         const og = document.createElement('optgroup');
         og.label = g;
         for (const k of keys) {
@@ -422,8 +451,50 @@ function populateDeviceSelect(selectEl) {
             opt.textContent = DEVICES[k].name + ` (${DEVICES[k].vram}GB)`;
             og.appendChild(opt);
         }
-        selectEl.appendChild(og);
+        deviceEl.appendChild(og);
     }
+}
+
+/** Legacy wrapper — still used if a page hasn't switched to vendor+device yet */
+function populateDeviceSelect(selectEl) {
+    selectEl.innerHTML = '';
+    for (const [vk, v] of Object.entries(VENDOR_DEVICE_GROUPS)) {
+        for (const [g, keys] of Object.entries(v.groups)) {
+            const og = document.createElement('optgroup');
+            og.label = v.label + ' ' + g;
+            for (const k of keys) {
+                if (!DEVICES[k]) continue;
+                const opt = document.createElement('option');
+                opt.value = k;
+                opt.textContent = DEVICES[k].name + ` (${DEVICES[k].vram}GB)`;
+                og.appendChild(opt);
+            }
+            selectEl.appendChild(og);
+        }
+    }
+}
+
+/** Helper: given a device key, find which vendor it belongs to */
+function getVendorForDevice(deviceKey) {
+    for (const [vk, v] of Object.entries(VENDOR_DEVICE_GROUPS)) {
+        for (const keys of Object.values(v.groups)) {
+            if (keys.includes(deviceKey)) return vk;
+        }
+    }
+    return Object.keys(VENDOR_DEVICE_GROUPS)[0];
+}
+
+/** Setup vendor+device two-level dropdowns. Returns {vendorEl, deviceEl} */
+function initVendorDeviceSelects(vendorEl, deviceEl, onChangeCb) {
+    populateVendorSelect(vendorEl);
+    populateDeviceSelectByVendor(deviceEl, vendorEl.value);
+    vendorEl.addEventListener('change', function() {
+        populateDeviceSelectByVendor(deviceEl, vendorEl.value);
+        if (onChangeCb) onChangeCb();
+    });
+    deviceEl.addEventListener('change', function() {
+        if (onChangeCb) onChangeCb();
+    });
 }
 
 function formatModelInfoLine(model) {
@@ -450,24 +521,41 @@ function saveConfigToURL() {
 
 function loadConfigFromURL() {
     const params = new URLSearchParams(window.location.search);
+    // Restore vendor+device — set vendor first so device list is populated
+    if (params.has('d')) {
+        const dk = params.get('d');
+        const vendorEl = document.getElementById('vendor-select');
+        const deviceEl = document.getElementById('device-select');
+        if (vendorEl && deviceEl) {
+            const vk = getVendorForDevice(dk);
+            vendorEl.value = vk;
+            populateDeviceSelectByVendor(deviceEl, vk);
+            deviceEl.value = dk;
+        } else if (deviceEl) {
+            deviceEl.value = dk;
+        }
+    }
     if (params.has('m')) document.getElementById('model-select').value = params.get('m');
-    if (params.has('d')) document.getElementById('device-select').value = params.get('d');
     if (params.has('q')) document.getElementById('quant').value = params.get('q');
     if (params.has('p')) {
         document.getElementById('prompt-len').value = params.get('p');
-        document.getElementById('prompt-val').textContent = params.get('p');
+        const pv = document.getElementById('prompt-val');
+        if (pv) pv.textContent = params.get('p');
     }
     if (params.has('o')) {
         document.getElementById('output-len').value = params.get('o');
-        document.getElementById('output-val').textContent = params.get('o');
+        const ov = document.getElementById('output-val');
+        if (ov) ov.textContent = params.get('o');
     }
     if (params.has('b')) {
         document.getElementById('batch-size').value = params.get('b');
-        document.getElementById('batch-val').textContent = params.get('b');
+        const bv = document.getElementById('batch-val');
+        if (bv) bv.textContent = params.get('b');
     }
     if (params.has('tp')) {
         document.getElementById('tp-size').value = params.get('tp');
-        document.getElementById('tp-val').textContent = params.get('tp');
+        const tv = document.getElementById('tp-val');
+        if (tv) tv.textContent = params.get('tp');
     }
     if (params.has('fa')) document.getElementById('flash-attn').checked = params.get('fa') === '1';
 }
@@ -480,6 +568,7 @@ const I18N = {
         'hero.desc': 'Estimate prefill latency, decode throughput, memory usage, and TTFT for LLMs on various GPUs using Roofline analysis.',
         // index.html config panel
         'cfg.model': 'Model',
+        'cfg.vendor': 'Vendor',
         'cfg.device': 'Device',
         'cfg.params': 'Parameters',
         'cfg.quant': 'Quantization',
@@ -648,6 +737,7 @@ const I18N = {
         'hero.title': 'LLM 推理性能估算器',
         'hero.desc': '基于 Roofline 模型估算大语言模型在不同 GPU 上的 Prefill 延迟、Decode 吞吐、显存占用和首 Token 时间。',
         'cfg.model': '模型',
+        'cfg.vendor': '厂商',
         'cfg.device': '设备',
         'cfg.params': '参数',
         'cfg.quant': '量化',

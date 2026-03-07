@@ -98,8 +98,10 @@
             <div id="model-info" class="text-sm text-gray-500 mt-2"></div>
         </div>
         <div class="bg-card rounded-xl p-4 border border-gray-800">
+            <label class="text-sm text-gray-400 block mb-1" data-i18n="cfg.vendor">Vendor</label>
+            <select id="vendor-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8 mb-2"></select>
             <label class="text-sm text-gray-400 block mb-1" data-i18n="cfg.device">Device</label>
-            <select id="device-select" onchange="onDeviceChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8"></select>
+            <select id="device-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8"></select>
             <div id="device-info" class="text-sm text-gray-500 mt-2"></div>
         </div>
         <div class="bg-card rounded-xl p-4 border border-gray-800 space-y-3">
@@ -206,11 +208,15 @@
     <p data-i18n="footer.ops">LLM Perf Model — Per-operation Roofline analysis runs in your browser. Estimates are theoretical upper bounds.</p>
 </footer>
 
-<script src="shared.js?v=14"></script>
+<script src="shared.js?v=15"></script>
 <script>
 // ── Init ──
 populateModelSelect(document.getElementById('model-select'));
-populateDeviceSelect(document.getElementById('device-select'));
+initVendorDeviceSelects(
+    document.getElementById('vendor-select'),
+    document.getElementById('device-select'),
+    function() { onDeviceChange(); }
+);
 loadConfigFromURL();
 
 const CAT_COLORS = { attn: '#34d399', ffn: '#38bdf8', norm: '#fbbf24', other: '#6b7280' };

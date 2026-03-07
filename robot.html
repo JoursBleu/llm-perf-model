@@ -134,6 +134,9 @@
             <!-- Device Select -->
             <div class="bg-card rounded-xl p-6 border border-gray-800">
                 <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🖥️ <span data-i18n="cfg.device">Device</span></h2>
+                <label class="text-sm text-gray-400 mb-1 block" data-i18n="cfg.vendor">Vendor</label>
+                <select id="vendor-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-3 pr-8"></select>
+                <label class="text-sm text-gray-400 mb-1 block" data-i18n="cfg.device">Device</label>
                 <select id="device-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-3 pr-8"></select>
                 <div id="device-info" class="text-sm text-gray-500 space-y-1"></div>
             </div>
@@ -272,7 +275,7 @@
     LLM Perf Model — AI Bot Sizer. All calculations run in your browser.
 </footer>
 
-<script src="shared.js?v=14"></script>
+<script src="shared.js?v=15"></script>
 <script>
 // ============ SCENARIO PRESETS ============
 const SCENARIOS = {
@@ -699,6 +702,7 @@ function renderTPSChart(model, modelKey, quantBits, ctxTokens, respTokens, concU
 // ============ INIT ============
 function initRobotPage() {
     const modelSel = document.getElementById('model-select');
+    const vendorSel = document.getElementById('vendor-select');
     const deviceSel = document.getElementById('device-select');
     const scenarioSel = document.getElementById('scenario-select');
     const quantSel = document.getElementById('quant');
@@ -706,22 +710,22 @@ function initRobotPage() {
     const flashAttnEl = document.getElementById('flash-attn');
 
     populateModelSelect(modelSel);
-    populateDeviceSelect(deviceSel);
+    initVendorDeviceSelects(vendorSel, deviceSel, evaluate);
 
     modelSel.addEventListener('change', evaluate);
     modelSel.addEventListener('input', evaluate);
-    deviceSel.addEventListener('change', evaluate);
-    deviceSel.addEventListener('input', evaluate);
     scenarioSel.addEventListener('change', onScenarioChange);
     quantSel.addEventListener('change', onQuantChange);
     kvQuantSel.addEventListener('change', evaluate);
     flashAttnEl.addEventListener('change', evaluate);
     // Default to a common consumer card
-    const ds = deviceSel;
-    if (DEVICES['rtx-4070']) ds.value = 'rtx-4070';
+    if (DEVICES['rtx-4070']) {
+        vendorSel.value = 'nvidia';
+        populateDeviceSelectByVendor(deviceSel, 'nvidia');
+        deviceSel.value = 'rtx-4070';
+    }
     // Default to a popular model
-    const ms = modelSel;
-    if (MODELS['qwen3-8b']) ms.value = 'qwen3-8b';
+    if (MODELS['qwen3-8b']) modelSel.value = 'qwen3-8b';
 
     initTheme();
     initLang();
