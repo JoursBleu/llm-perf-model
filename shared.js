@@ -404,19 +404,19 @@ const VENDOR_DEVICE_GROUPS = {
     'nvidia': {
         label: 'NVIDIA',
         groups: {
-            'Data Center': ['h200-sxm','h100-sxm','a100-sxm-80','a100-sxm-40','l40s'],
             'GeForce RTX 50': ['rtx-5090','rtx-5080','rtx-5070ti','rtx-5070'],
             'GeForce RTX 40': ['rtx-4090','rtx-4080s','rtx-4080','rtx-4070tis','rtx-4070ti','rtx-4070s','rtx-4070','rtx-4060ti-16','rtx-4060ti','rtx-4060'],
             'GeForce RTX 30': ['rtx-3090','rtx-3080ti','rtx-3080','rtx-3070ti','rtx-3070','rtx-3060ti','rtx-3060'],
             'Edge / Arm': ['dgx-spark'],
+            'Data Center': ['h200-sxm','h100-sxm','a100-sxm-80','a100-sxm-40','l40s'],
         }
     },
     'amd': {
         label: 'AMD',
         groups: {
-            'Data Center': ['mi300x','mi250x'],
-            'Consumer / Pro': ['w7900','ai-pro-r9700','rx-9700xt','rx-9070xt','rx-7900xtx'],
+            'Consumer / Pro': ['rx-9700xt','rx-9070xt','rx-7900xtx','ai-pro-r9700','w7900'],
             'APU': ['strix-halo'],
+            'Data Center': ['mi300x','mi250x'],
         }
     },
     'apple': {
