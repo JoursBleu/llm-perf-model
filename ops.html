@@ -66,7 +66,7 @@
     <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
         <div class="flex items-center gap-2 text-xl font-bold shrink-0"><span class="text-2xl">⚡</span><span class="text-primary">LLM Perf Model</span></div>
         <nav class="flex items-center gap-4 text-sm">
-            <a id="nav-index" href="index.html" class="nav-link py-1 text-gray-400">📊 <span data-i18n="nav.overall">Overall</span></a>
+            <a id="nav-index" href="./" class="nav-link py-1 text-gray-400">📊 <span data-i18n="nav.overall">Overall</span></a>
             <a href="ops.html" class="nav-link nav-active py-1 font-medium">🔬 <span data-i18n="nav.ops">Per-Op</span></a>
             <a id="nav-robot" href="robot.html" class="nav-link py-1 text-gray-400">🤖 <span data-i18n="nav.robot">Bot</span></a>
         </nav>
@@ -200,7 +200,7 @@
     <!-- CTA back to overall -->
     <div class="bg-gradient-to-r from-indigo-900/30 to-cyan-900/30 rounded-xl p-6 border border-indigo-800/40 mb-8 text-center">
         <p class="text-gray-300 mb-3" data-i18n="cta.index">See overall performance estimates</p>
-        <a id="cta-index" href="index.html" class="inline-block bg-primary hover:bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-medium transition-colors" data-i18n="cta.index.btn">📊 Overall Performance ←</a>
+        <a id="cta-index" href="./" class="inline-block bg-primary hover:bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-medium transition-colors" data-i18n="cta.index.btn">📊 Overall Performance ←</a>
     </div>
 </main>
 
@@ -241,8 +241,8 @@ function renderOps() {
 
     // Sync nav links
     const qs = saveConfigToURL();
-    document.getElementById('nav-index').href = 'index.html?' + qs;
-    document.getElementById('cta-index').href = 'index.html?' + qs;
+    document.getElementById('nav-index').href = './?' + qs;
+    document.getElementById('cta-index').href = './?' + qs;
 
     const tokens = currentTab === 'prefill' ? promptLen : 1;
     const kvPos = promptLen + Math.floor(outputLen / 2);
