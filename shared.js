@@ -6,7 +6,10 @@ const MODELS = {
     'llama-3.2-1b': { name:'LLaMA 3.2 1B', params:1.24e9, activeParams:1.24e9, layers:16, heads:32, kvHeads:8, hiddenDim:2048, headDim:64, interDim:8192, vocabSize:128256, maxCtx:131072, moe:false, arch:'LLaMA' },
     'llama-3.2-3b': { name:'LLaMA 3.2 3B', params:3.21e9, activeParams:3.21e9, layers:28, heads:24, kvHeads:8, hiddenDim:3072, headDim:128, interDim:8192, vocabSize:128256, maxCtx:131072, moe:false, arch:'LLaMA' },
     'llama-3-8b': { name:'LLaMA 3 8B', params:8e9, activeParams:8e9, layers:32, heads:32, kvHeads:8, hiddenDim:4096, headDim:128, interDim:14336, vocabSize:128256, maxCtx:8192, moe:false, arch:'LLaMA' },
+    'llama-3.1-8b': { name:'LLaMA 3.1 8B', params:8e9, activeParams:8e9, layers:32, heads:32, kvHeads:8, hiddenDim:4096, headDim:128, interDim:14336, vocabSize:128256, maxCtx:131072, moe:false, arch:'LLaMA' },
     'llama-3-70b': { name:'LLaMA 3 70B', params:70.6e9, activeParams:70.6e9, layers:80, heads:64, kvHeads:8, hiddenDim:8192, headDim:128, interDim:28672, vocabSize:128256, maxCtx:8192, moe:false, arch:'LLaMA' },
+    'llama-3.1-70b': { name:'LLaMA 3.1 70B', params:70.6e9, activeParams:70.6e9, layers:80, heads:64, kvHeads:8, hiddenDim:8192, headDim:128, interDim:28672, vocabSize:128256, maxCtx:131072, moe:false, arch:'LLaMA' },
+    'llama-3.3-70b': { name:'LLaMA 3.3 70B', params:70.6e9, activeParams:70.6e9, layers:80, heads:64, kvHeads:8, hiddenDim:8192, headDim:128, interDim:28672, vocabSize:128256, maxCtx:131072, moe:false, arch:'LLaMA' },
     'llama-3.1-405b': { name:'LLaMA 3.1 405B', params:405e9, activeParams:405e9, layers:126, heads:128, kvHeads:8, hiddenDim:16384, headDim:128, interDim:53248, vocabSize:128256, maxCtx:131072, moe:false, arch:'LLaMA' },
     // Qwen 3 family
     'qwen3-0.6b': { name:'Qwen3 0.6B', params:0.6e9, activeParams:0.6e9, layers:28, heads:16, kvHeads:8, hiddenDim:1024, headDim:128, interDim:3072, vocabSize:151936, maxCtx:32768, moe:false, arch:'Qwen3' },
@@ -55,10 +58,12 @@ const DEVICES = {
     // interconnectLatUs: per-AllReduce latency (μs) incl. software overhead
     // maxGPUs: max realistic multi-GPU count for this device
     'h200-sxm': { name:'NVIDIA H200 SXM', vram:141, bw:4800, fp16Tflops:989, fp8Tflops:1979, int8Tflops:1979, vendor:'nvidia', interconnectBW:450, interconnectLatUs:5, maxGPUs:8 },
+    'b200-sxm': { name:'NVIDIA B200 SXM', vram:192, bw:8000, fp16Tflops:2250, fp8Tflops:4500, int8Tflops:4500, vendor:'nvidia', interconnectBW:900, interconnectLatUs:3, maxGPUs:8 },
     'h100-sxm': { name:'NVIDIA H100 SXM', vram:80, bw:3350, fp16Tflops:989, fp8Tflops:1979, int8Tflops:1979, vendor:'nvidia', interconnectBW:450, interconnectLatUs:5, maxGPUs:8 },
     'a100-sxm-80': { name:'NVIDIA A100 80GB', vram:80, bw:2039, fp16Tflops:312, fp8Tflops:312, int8Tflops:624, vendor:'nvidia', interconnectBW:300, interconnectLatUs:5, maxGPUs:8 },
     'a100-sxm-40': { name:'NVIDIA A100 40GB', vram:40, bw:1555, fp16Tflops:312, fp8Tflops:312, int8Tflops:624, vendor:'nvidia', interconnectBW:300, interconnectLatUs:5, maxGPUs:8 },
     'l40s': { name:'NVIDIA L40S', vram:48, bw:864, fp16Tflops:362, fp8Tflops:733, int8Tflops:733, vendor:'nvidia', interconnectBW:32, interconnectLatUs:15, maxGPUs:8 },
+    'l4': { name:'NVIDIA L4', vram:24, bw:300, fp16Tflops:121, fp8Tflops:242, int8Tflops:242, vendor:'nvidia', interconnectBW:0, interconnectLatUs:0, maxGPUs:1 },
     // ── GeForce RTX 50 (Blackwell) ──
     'rtx-5090': { name:'RTX 5090', vram:32, bw:1792, fp16Tflops:209, fp8Tflops:419, int8Tflops:419, vendor:'nvidia', interconnectBW:64, interconnectLatUs:10, maxGPUs:2 },
     'rtx-5080': { name:'RTX 5080', vram:16, bw:960, fp16Tflops:113, fp8Tflops:225, int8Tflops:225, vendor:'nvidia', interconnectBW:64, interconnectLatUs:10, maxGPUs:2 },
@@ -86,6 +91,7 @@ const DEVICES = {
     // ── NVIDIA Edge ──
     'dgx-spark': { name:'NVIDIA DGX Spark (GB10)', vram:128, bw:273, fp16Tflops:209, fp8Tflops:418, int8Tflops:418, vendor:'nvidia', interconnectBW:0, interconnectLatUs:0, maxGPUs:1 },
     'mi300x': { name:'AMD MI300X', vram:192, bw:5300, fp16Tflops:1307, fp8Tflops:2614, int8Tflops:2614, vendor:'amd', interconnectBW:448, interconnectLatUs:5, maxGPUs:8 },
+    'mi325x': { name:'AMD MI325X', vram:256, bw:6000, fp16Tflops:1307, fp8Tflops:2614, int8Tflops:2614, vendor:'amd', interconnectBW:448, interconnectLatUs:5, maxGPUs:8 },
     'mi250x': { name:'AMD MI250X', vram:128, bw:3277, fp16Tflops:383, fp8Tflops:383, int8Tflops:383, vendor:'amd', interconnectBW:400, interconnectLatUs:5, maxGPUs:8 },
     'rx-9700xt': { name:'Radeon RX 9700 XT', vram:24, bw:864, fp16Tflops:56, fp8Tflops:112, int8Tflops:112, vendor:'amd', interconnectBW:32, interconnectLatUs:15, maxGPUs:2 },
     'rx-9070xt': { name:'Radeon RX 9070 XT', vram:16, bw:640, fp16Tflops:49, fp8Tflops:98, int8Tflops:98, vendor:'amd', interconnectBW:32, interconnectLatUs:15, maxGPUs:2 },
@@ -95,7 +101,13 @@ const DEVICES = {
     'strix-halo': { name:'AMD Ryzen AI Max 395 (Strix Halo)', vram:128, bw:256, fp16Tflops:30, fp8Tflops:30, int8Tflops:60, vendor:'amd', interconnectBW:0, interconnectLatUs:0, maxGPUs:1 },
     'm4-max': { name:'Apple M4 Max', vram:128, bw:546, fp16Tflops:54, fp8Tflops:54, int8Tflops:54, vendor:'apple', interconnectBW:0, interconnectLatUs:0, maxGPUs:1 },
     'm4-pro': { name:'Apple M4 Pro', vram:48, bw:273, fp16Tflops:22, fp8Tflops:22, int8Tflops:22, vendor:'apple', interconnectBW:0, interconnectLatUs:0, maxGPUs:1 },
-    'm2-ultra': { name:'Apple M2 Ultra', vram:192, bw:800, fp16Tflops:27, fp8Tflops:27, int8Tflops:27, vendor:'apple', interconnectBW:0, interconnectLatUs:0, maxGPUs:1 }
+    'm2-ultra': { name:'Apple M2 Ultra', vram:192, bw:800, fp16Tflops:27, fp8Tflops:27, int8Tflops:27, vendor:'apple', interconnectBW:0, interconnectLatUs:0, maxGPUs:1 },
+    // ── Intel Gaudi ──
+    'gaudi2': { name:'Intel Gaudi 2', vram:96, bw:2460, fp16Tflops:420, fp8Tflops:865, int8Tflops:865, vendor:'intel', interconnectBW:150, interconnectLatUs:10, maxGPUs:8 },
+    'gaudi3': { name:'Intel Gaudi 3', vram:128, bw:3700, fp16Tflops:900, fp8Tflops:1835, int8Tflops:1835, vendor:'intel', interconnectBW:300, interconnectLatUs:8, maxGPUs:8 },
+    // ── Google TPU ──
+    'tpu-v5p': { name:'Google TPU v5p', vram:95, bw:2765, fp16Tflops:459, fp8Tflops:459, int8Tflops:918, vendor:'google', interconnectBW:400, interconnectLatUs:5, maxGPUs:8 },
+    'tpu-v6e': { name:'Google TPU v6e (Trillium)', vram:32, bw:1640, fp16Tflops:918, fp8Tflops:918, int8Tflops:1836, vendor:'google', interconnectBW:400, interconnectLatUs:5, maxGPUs:8 }
 };
 
 // ============ CONSTANTS ============
@@ -406,7 +418,7 @@ const VENDOR_DEVICE_GROUPS = {
         groups: {
             'Consumer / Pro': ['rx-9700xt','rx-9070xt','rx-7900xtx','ai-pro-r9700','w7900'],
             'APU': ['strix-halo'],
-            'Data Center': ['mi300x','mi250x'],
+            'Data Center': ['mi325x','mi300x','mi250x'],
         }
     },
     'nvidia': {
@@ -416,13 +428,25 @@ const VENDOR_DEVICE_GROUPS = {
             'GeForce RTX 40': ['rtx-4090','rtx-4080s','rtx-4080','rtx-4070tis','rtx-4070ti','rtx-4070s','rtx-4070','rtx-4060ti-16','rtx-4060ti','rtx-4060'],
             'GeForce RTX 30': ['rtx-3090','rtx-3080ti','rtx-3080','rtx-3070ti','rtx-3070','rtx-3060ti','rtx-3060'],
             'Edge / Arm': ['dgx-spark'],
-            'Data Center': ['h200-sxm','h100-sxm','a100-sxm-80','a100-sxm-40','l40s'],
+            'Data Center': ['b200-sxm','h200-sxm','h100-sxm','a100-sxm-80','a100-sxm-40','l40s','l4'],
         }
     },
     'apple': {
         label: 'Apple',
         groups: {
             'Apple Silicon': ['m4-max','m4-pro','m2-ultra'],
+        }
+    },
+    'intel': {
+        label: 'Intel',
+        groups: {
+            'Gaudi Accelerator': ['gaudi3','gaudi2'],
+        }
+    },
+    'google': {
+        label: 'Google',
+        groups: {
+            'Cloud TPU': ['tpu-v6e','tpu-v5p'],
         }
     },
 };
