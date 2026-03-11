@@ -164,6 +164,18 @@
                         <option value="2">INT2</option>
                     </select>
                 </div>
+                <div>
+                    <label class="text-sm text-gray-400" data-i18n="cfg.flops.util">FLOPS Utilization (%)</label>
+                    <input id="flops-util" type="number" min="1" max="100" value="75" onchange="evaluate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400" data-i18n="cfg.mem.util">Memory Utilization (%)</label>
+                    <input id="mem-util" type="number" min="1" max="100" value="80" onchange="evaluate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400" data-i18n="cfg.net.util">Network BW Utilization (%)</label>
+                    <input id="net-util" type="number" min="1" max="100" value="80" onchange="evaluate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1">
+                </div>
                 <div class="flex items-center justify-between mt-2">
                     <label class="text-sm text-gray-400" data-i18n="cfg.flash">FlashAttention</label>
                     <label class="relative inline-flex items-center cursor-pointer">
@@ -275,7 +287,7 @@
     LLM Perf Model — AI Bot Sizer. All calculations run in your browser.
 </footer>
 
-<script src="shared.js?v=16"></script>
+<script src="shared.js?v=17"></script>
 <script>
 // ============ SCENARIO PRESETS ============
 const SCENARIOS = {
@@ -322,7 +334,7 @@ function onQuantChange() {
 }
 
 // ============ CORE EVALUATION ============
-function evalBot(model, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits) {
+function evalBot(model, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits, computeUtil, bwUtil) {
     const totalSeq = ctxTokens + respTokens;
     const modelSizeGB = calcModelSizeGB(model, quantBits);
     const kvPerUserGB = calcKVCacheGB(model, totalSeq, 1, quantBits, kvBits);
@@ -344,10 +356,10 @@ function evalBot(model, device, quantBits, ctxTokens, respTokens, concUsers, fla
     const pfAttn = calcAttentionFlopsPrefill(model, ctxTokens, 1);
     let pfComputeS;
     if (flashAttn) {
-        pfComputeS = (pfLinear + pfAttn) / (rawTflops * COMPUTE_UTIL * 1e12);
+        pfComputeS = (pfLinear + pfAttn) / (rawTflops * computeUtil * 1e12);
     } else {
-        pfComputeS = pfLinear / (rawTflops * COMPUTE_UTIL * 1e12)
-                   + pfAttn / (rawTflops * COMPUTE_UTIL * 1e12 * (0.40 / COMPUTE_UTIL));
+        pfComputeS = pfLinear / (rawTflops * computeUtil * 1e12)
+                   + pfAttn / (rawTflops * computeUtil * 1e12 * (0.40 / computeUtil));
     }
     const ttftMs = pfComputeS * 1000;
 
@@ -357,9 +369,9 @@ function evalBot(model, device, quantBits, ctxTokens, respTokens, concUsers, fla
     let kvRead = calcKVCacheGB(model, Math.floor(avgPos), 1, quantBits, kvBits) * 1e9;
     if (!flashAttn) kvRead += 2 * 1 * model.heads * avgPos * 4 * model.layers;
     const totalRead = activeBytes + kvRead;
-    const decMemS = totalRead / (device.bw * BW_UTIL * 1e9);
+    const decMemS = totalRead / (device.bw * bwUtil * 1e9);
     const decFlops = 2 * model.activeParams * 1 + calcAttentionFlopsDecodeStep(model, avgPos, 1);
-    const decCompS = decFlops / (rawTflops * COMPUTE_UTIL * 1e12);
+    const decCompS = decFlops / (rawTflops * computeUtil * 1e12);
     const decStepMs = Math.max(decMemS, decCompS) * 1000;
     const tps = 1000 / decStepMs;
 
@@ -426,6 +438,7 @@ function evaluate() {
     const respTokens = parseInt(document.getElementById('resp-tokens').value);
     const concUsers = parseInt(document.getElementById('conc-users').value);
     const flashAttn = document.getElementById('flash-attn').checked;
+    const { computeUtil, bwUtil } = getUtilizationConfig();
 
     // Show model & device info
     const modelInfo = (typeof formatModelInfoLine === 'function')
@@ -438,7 +451,7 @@ function evaluate() {
     document.getElementById('device-info').innerHTML = deviceInfo;
 
     // Evaluate selected combo
-    const r = evalBot(model, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits);
+    const r = evalBot(model, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits, computeUtil, bwUtil);
     r._vram = device.vram;
 
     // Grade banner
@@ -485,13 +498,13 @@ function evaluate() {
     document.getElementById('lbl-free').textContent = (getLang() === 'zh' ? '剩余: ' : 'Free: ') + Math.max(0, vram - (r.oom ? 0 : r.memGB)).toFixed(1) + ' GB';
 
     // ── Compare: All models on this device ──
-    renderModelsTable(device, deviceKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, modelKey, kvBits);
+    renderModelsTable(device, deviceKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, modelKey, kvBits, computeUtil, bwUtil);
 
     // ── Compare: All devices for this model ──
-    renderDevicesTable(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, deviceKey, kvBits);
+    renderDevicesTable(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, deviceKey, kvBits, computeUtil, bwUtil);
 
     // ── Chart ──
-    renderTPSChart(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits);
+    renderTPSChart(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits, computeUtil, bwUtil);
   } catch (err) {
     console.error('evaluate() error:', err);
     const banner = document.getElementById('grade-banner');
@@ -501,7 +514,7 @@ function evaluate() {
 
 window.evaluate = evaluate;
 
-function renderModelsTable(device, deviceKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, selectedModelKey, kvBits) {
+function renderModelsTable(device, deviceKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, selectedModelKey, kvBits, computeUtil, bwUtil) {
     const shortDevName = device.name.replace('NVIDIA ','').replace('AMD ','').replace('GeForce ','');
     document.getElementById('cmp-models-sub').textContent =
         (getLang() === 'zh' ? '在 ' : 'On ') + shortDevName +
@@ -522,7 +535,7 @@ function renderModelsTable(device, deviceKey, quantBits, ctxTokens, respTokens, 
     let bodyHTML = '';
     for (const mk of modelKeys) {
         const m = MODELS[mk];
-        const r = evalBot(m, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits);
+        const r = evalBot(m, device, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits, computeUtil, bwUtil);
         r._vram = device.vram;
         const g = grade(r);
         const isSelected = mk === selectedModelKey;
@@ -551,7 +564,7 @@ function renderModelsTable(device, deviceKey, quantBits, ctxTokens, respTokens, 
     document.getElementById('cmp-models-body').innerHTML = bodyHTML;
 }
 
-function renderDevicesTable(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, selectedDeviceKey, kvBits) {
+function renderDevicesTable(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, selectedDeviceKey, kvBits, computeUtil, bwUtil) {
     document.getElementById('cmp-devices-sub').textContent =
         (getLang() === 'zh' ? '运行 ' : 'Running ') + model.name +
         (getLang() === 'zh' ? '，哪些设备够用？' : ' — which devices are sufficient?');
@@ -571,7 +584,7 @@ function renderDevicesTable(model, modelKey, quantBits, ctxTokens, respTokens, c
     let bodyHTML = '';
     for (const dk of deviceKeys) {
         const d = DEVICES[dk];
-        const r = evalBot(model, d, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits);
+        const r = evalBot(model, d, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits, computeUtil, bwUtil);
         r._vram = d.vram;
         const g = grade(r);
         const isSelected = dk === selectedDeviceKey;
@@ -602,7 +615,7 @@ function renderDevicesTable(model, modelKey, quantBits, ctxTokens, respTokens, c
     document.getElementById('cmp-devices-body').innerHTML = bodyHTML;
 }
 
-function renderTPSChart(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits) {
+function renderTPSChart(model, modelKey, quantBits, ctxTokens, respTokens, concUsers, flashAttn, kvBits, computeUtil, bwUtil) {
     const ctx = document.getElementById('tps-chart').getContext('2d');
     const tc = chartThemeColors();
     const deviceKeys = Object.keys(DEVICES);
@@ -614,7 +627,7 @@ function renderTPSChart(model, modelKey, quantBits, ctxTokens, respTokens, concU
 
     for (const dk of deviceKeys) {
         const d = DEVICES[dk];
-        const r = evalBot(model, d, quantBits, ctxTokens, respTokens, 1, flashAttn, kvBits);
+        const r = evalBot(model, d, quantBits, ctxTokens, respTokens, 1, flashAttn, kvBits, computeUtil, bwUtil);
         const shortName = d.name.replace('NVIDIA ','').replace('AMD ','').replace('GeForce ','');
         labels.push(shortName);
         data.push(r.oom ? 0 : r.tps);

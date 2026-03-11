@@ -136,6 +136,18 @@
                         <option value="2">INT2</option>
                     </select>
                 </div>
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.flops.util">FLOPS Utilization (%)</span></label>
+                    <input id="flops-util" type="number" min="1" max="100" value="75" onchange="calculate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.mem.util">Memory Utilization (%)</span></label>
+                    <input id="mem-util" type="number" min="1" max="100" value="80" onchange="calculate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.net.util">Network BW Utilization (%)</span></label>
+                    <input id="net-util" type="number" min="1" max="100" value="80" onchange="calculate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1">
+                </div>
             </div>
         </div>
 
@@ -297,7 +309,7 @@
     <p data-i18n="footer.index">LLM Perf Model — All calculations run in your browser. Estimates are theoretical upper bounds.</p>
 </footer>
 
-<script src="shared.js?v=16"></script>
+<script src="shared.js?v=17"></script>
 <script>
 // ── Populate selects from shared data ──
 populateModelSelect(document.getElementById('model-select'));
@@ -326,7 +338,7 @@ let scalingChart = null;
 function runCalc() {
     const cfg = readConfig();
     const { model, device, quantBits, kvBits, promptLen, outputLen, batchSize, tp, flashAttn,
-            effectiveTflops, effectiveBW, modelKey, deviceKey } = cfg;
+            effectiveTflops, effectiveBW, modelKey, deviceKey, computeUtil, bwUtil, netBwUtil } = cfg;
 
     // Memory
     const modelSizeGB = calcModelSizeGB(model, quantBits);
@@ -350,7 +362,7 @@ function runCalc() {
     if (flashAttn) {
         prefillTimeS = prefillTotalFlops / (effectiveTflops * 1e12);
     } else {
-        const attnUtilFactor = 0.40 / COMPUTE_UTIL;
+        const attnUtilFactor = 0.40 / computeUtil;
         prefillTimeS = prefillLinearFlops / (effectiveTflops * 1e12)
                      + prefillAttnFlops / (effectiveTflops * 1e12 * attnUtilFactor);
     }
@@ -389,7 +401,7 @@ function runCalc() {
         decodeMemBoundMs: decodeMemBoundS * 1000, decodeComputeBoundMs: decodeComputeBoundS * 1000,
         decodeTokenMs, decodeTPS, decodeBottleneck,
         totalMs, totalOutputTPS,
-        effectiveTflops, effectiveBW, ridgePoint, prefillAI, decodeAI };
+        effectiveTflops, effectiveBW, ridgePoint, prefillAI, decodeAI, computeUtil, bwUtil, netBwUtil };
 }
 
 function calculate() {
@@ -471,9 +483,9 @@ function renderRoofline(r) {
     });
 }
 
-function runCalcForDevice(model, dev, quantBits, promptLen, outputLen, batchSize, tp, flashAttn, kvBits) {
+function runCalcForDevice(model, dev, quantBits, promptLen, outputLen, batchSize, tp, flashAttn, kvBits, computeUtil, bwUtil) {
     let tpEff = Math.max(1.0 - TP_COMM_OVERHEAD * Math.max(0, tp-1), 0.5);
-    const rawT = getDeviceTflops(dev, quantBits), effT = rawT*tp*tpEff*COMPUTE_UTIL, effBW = dev.bw*tp*tpEff*BW_UTIL;
+    const rawT = getDeviceTflops(dev, quantBits), effT = rawT*tp*tpEff*computeUtil, effBW = dev.bw*tp*tpEff*bwUtil;
     const mSz = (model.params*quantBits/8)/1e9;
     const kvGB = calcKVCacheGB(model, promptLen+outputLen, batchSize, quantBits, kvBits);
     let actGB = (model.hiddenDim*promptLen*batchSize*4*2)/1e9;
@@ -495,7 +507,7 @@ function renderComparison(r) {
     const ctx = document.getElementById('compare-chart').getContext('2d');
     const results = [];
     for (const [dk,dev] of Object.entries(DEVICES)) {
-        const res = runCalcForDevice(r.model, dev, r.quantBits, r.promptLen, r.outputLen, r.batchSize, r.tp, r.flashAttn, r.kvBits);
+        const res = runCalcForDevice(r.model, dev, r.quantBits, r.promptLen, r.outputLen, r.batchSize, r.tp, r.flashAttn, r.kvBits, r.computeUtil, r.bwUtil);
         if (res.fitsInMemory) results.push({ name:dev.name, decodeTPS:res.decodeTPS, key:dk });
     }
     results.sort((a,b) => b.decodeTPS - a.decodeTPS);
@@ -515,7 +527,7 @@ function renderComparison(r) {
 }
 
 function renderScaling(r) {
-    const results = calcMultiGPUScaling(r.model, r.device, r.quantBits, r.promptLen, r.outputLen, r.batchSize, r.flashAttn, r.kvBits);
+    const results = calcMultiGPUScaling(r.model, r.device, r.quantBits, r.promptLen, r.outputLen, r.batchSize, r.flashAttn, r.kvBits, r.netBwUtil, r.computeUtil, r.bwUtil);
 
     // Interconnect info
     const icBW = r.device.interconnectBW || 0;

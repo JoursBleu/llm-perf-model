@@ -111,9 +111,24 @@ const DEVICES = {
 };
 
 // ============ CONSTANTS ============
-const COMPUTE_UTIL = 0.55;
-const BW_UTIL = 0.70;
+const COMPUTE_UTIL = 0.75;
+const BW_UTIL = 0.80;
+const NET_BW_UTIL = 0.80;
 const TP_COMM_OVERHEAD = 0.05;
+
+function parsePctInput(el, fallback) {
+    if (!el) return fallback;
+    const v = parseFloat(el.value);
+    if (!isFinite(v)) return fallback;
+    return Math.min(1, Math.max(0.01, v / 100));
+}
+
+function getUtilizationConfig() {
+    const computeUtil = parsePctInput(document.getElementById('flops-util'), COMPUTE_UTIL);
+    const bwUtil = parsePctInput(document.getElementById('mem-util'), BW_UTIL);
+    const netBwUtil = parsePctInput(document.getElementById('net-util'), NET_BW_UTIL);
+    return { computeUtil, bwUtil, netBwUtil };
+}
 
 // ============ UTILITY FUNCTIONS ============
 function getDeviceTflops(device, quantBits) {
@@ -191,13 +206,15 @@ function readConfig() {
     const model = MODELS[modelKey];
     const device = DEVICES[deviceKey];
 
+    const { computeUtil, bwUtil, netBwUtil } = getUtilizationConfig();
+
     let tpEff = Math.max(1.0 - TP_COMM_OVERHEAD * Math.max(0, tp - 1), 0.5);
     const rawTflops = getDeviceTflops(device, quantBits);
-    const effectiveTflops = rawTflops * tp * tpEff * COMPUTE_UTIL;
-    const effectiveBW = device.bw * tp * tpEff * BW_UTIL;
+    const effectiveTflops = rawTflops * tp * tpEff * computeUtil;
+    const effectiveBW = device.bw * tp * tpEff * bwUtil;
 
     return { modelKey, deviceKey, quantBits, kvBits, promptLen, outputLen, batchSize, tp, flashAttn,
-             model, device, effectiveTflops, effectiveBW };
+             model, device, effectiveTflops, effectiveBW, computeUtil, bwUtil, netBwUtil };
 }
 
 // ============ PER-OP COMPUTATION (shared) ============
@@ -279,7 +296,7 @@ function computeLayerOps(model, effTflops, effBW, quantBits, tokens, batchSize, 
 }
 
 // ============ MULTI-GPU SCALING ============
-function calcMultiGPUScaling(model, device, quantBits, promptLen, outputLen, batchSize, flashAttn, kvBits) {
+function calcMultiGPUScaling(model, device, quantBits, promptLen, outputLen, batchSize, flashAttn, kvBits, netBwUtil = NET_BW_UTIL, computeUtil = COMPUTE_UTIL, bwUtil = BW_UTIL) {
     const maxGPUs = device.maxGPUs || 1;
     const icBW = (device.interconnectBW || 0) * 1e9;
     const icLat = (device.interconnectLatUs || 0) * 1e-6;
@@ -289,7 +306,7 @@ function calcMultiGPUScaling(model, device, quantBits, promptLen, outputLen, bat
     const results = [];
 
     // Graph mode: all ops captured in CUDA/HIP graph, per-kernel launch latency = 0
-    const bw = icBW > 0 ? icBW : 32e9;
+    const bw = (icBW > 0 ? icBW : 32e9) * netBwUtil;
 
     // Point-to-point send between PP stages (pure bandwidth)
     function p2pTime(tokens) {
@@ -335,10 +352,10 @@ function calcMultiGPUScaling(model, device, quantBits, promptLen, outputLen, bat
             const pfAttn = calcAttentionFlopsPrefill(model, promptLen, batchSize);
             let pfComputeS;
             if (flashAttn) {
-                pfComputeS = (pfLinear + pfAttn) / (rawTflops * tp * COMPUTE_UTIL * 1e12);
+                pfComputeS = (pfLinear + pfAttn) / (rawTflops * tp * computeUtil * 1e12);
             } else {
-                pfComputeS = pfLinear / (rawTflops * tp * COMPUTE_UTIL * 1e12)
-                           + pfAttn / (rawTflops * tp * COMPUTE_UTIL * 1e12 * (0.40 / COMPUTE_UTIL));
+                pfComputeS = pfLinear / (rawTflops * tp * computeUtil * 1e12)
+                           + pfAttn / (rawTflops * tp * computeUtil * 1e12 * (0.40 / computeUtil));
             }
             const pfTPComm = tpCommPerLayer(tp, promptLen) * L;
             const pfPPComm = (pp > 1) ? p2pTime(promptLen) * (pp - 1) : 0;
@@ -353,9 +370,9 @@ function calcMultiGPUScaling(model, device, quantBits, promptLen, outputLen, bat
             let kvRead = calcKVCacheGB(model, Math.floor(avgPos), batchSize, quantBits, kvBits) * 1e9;
             if (!flashAttn) kvRead += 2 * batchSize * model.heads * avgPos * 4 * L;
             const totalRead = activeBytes + kvRead;
-            const decMemS = (totalRead / tp) / (device.bw * BW_UTIL * 1e9);
+            const decMemS = (totalRead / tp) / (device.bw * bwUtil * 1e9);
             const decFlops = 2 * model.activeParams * batchSize + calcAttentionFlopsDecodeStep(model, avgPos, batchSize);
-            const decCompS = decFlops / (rawTflops * tp * COMPUTE_UTIL * 1e12);
+            const decCompS = decFlops / (rawTflops * tp * computeUtil * 1e12);
             const decTPComm = tpCommPerLayer(tp, 1) * L;
             const decPPComm = (pp > 1) ? p2pTime(1) * (pp - 1) : 0;
             const decStepS = Math.max(decMemS, decCompS) + decTPComm + decPPComm;
@@ -540,6 +557,12 @@ function saveConfigToURL() {
     params.set('b', document.getElementById('batch-size').value);
     params.set('tp', document.getElementById('tp-size').value);
     params.set('fa', document.getElementById('flash-attn').checked ? '1' : '0');
+    const fu = document.getElementById('flops-util');
+    const mu = document.getElementById('mem-util');
+    const nu = document.getElementById('net-util');
+    if (fu) params.set('fu', fu.value);
+    if (mu) params.set('mu', mu.value);
+    if (nu) params.set('nu', nu.value);
     return params.toString();
 }
 
@@ -582,6 +605,18 @@ function loadConfigFromURL() {
         if (tv) tv.textContent = params.get('tp');
     }
     if (params.has('fa')) document.getElementById('flash-attn').checked = params.get('fa') === '1';
+    if (params.has('fu')) {
+        const fu = document.getElementById('flops-util');
+        if (fu) fu.value = params.get('fu');
+    }
+    if (params.has('mu')) {
+        const mu = document.getElementById('mem-util');
+        if (mu) mu.value = params.get('mu');
+    }
+    if (params.has('nu')) {
+        const nu = document.getElementById('net-util');
+        if (nu) nu.value = params.get('nu');
+    }
 }
 
 // ============ I18N ============
@@ -600,6 +635,9 @@ const I18N = {
         'cfg.output': 'Output Length (decode)',
         'cfg.batch': 'Batch Size',
         'cfg.tp': 'Tensor Parallel (GPUs)',
+        'cfg.flops.util': 'FLOPS Utilization (%)',
+        'cfg.mem.util': 'Memory Utilization (%)',
+        'cfg.net.util': 'Network BW Utilization (%)',
         'cfg.flash': 'FlashAttention',
         'cfg.flash.note': 'IO-aware tiling',
         // index.html result cards
@@ -769,6 +807,9 @@ const I18N = {
         'cfg.output': '输出长度（解码）',
         'cfg.batch': '批大小',
         'cfg.tp': '张量并行（GPU 数）',
+        'cfg.flops.util': 'FLOPS 利用率（%）',
+        'cfg.mem.util': '显存带宽利用率（%）',
+        'cfg.net.util': '网络带宽利用率（%）',
         'cfg.flash': 'FlashAttention',
         'cfg.flash.note': 'IO 感知分块',
         'res.prefill': '预填充延迟',

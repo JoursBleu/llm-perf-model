@@ -116,6 +116,18 @@
                 </select>
             </div>
             <div>
+                <label class="text-sm text-gray-400" data-i18n="cfg.flops.util">FLOPS Utilization (%)</label>
+                <input id="flops-util" type="number" min="1" max="100" value="75" onchange="renderOps()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-1.5 text-gray-100 text-sm mt-1">
+            </div>
+            <div>
+                <label class="text-sm text-gray-400" data-i18n="cfg.mem.util">Memory Utilization (%)</label>
+                <input id="mem-util" type="number" min="1" max="100" value="80" onchange="renderOps()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-1.5 text-gray-100 text-sm mt-1">
+            </div>
+            <div>
+                <label class="text-sm text-gray-400" data-i18n="cfg.net.util">Network BW Utilization (%)</label>
+                <input id="net-util" type="number" min="1" max="100" value="80" onchange="renderOps()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-1.5 text-gray-100 text-sm mt-1">
+            </div>
+            <div>
                 <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.prompt">Prompt Length</span><span id="prompt-val" class="text-primary">512</span></label>
                 <input type="range" id="prompt-len" min="32" max="32768" value="512" step="32" oninput="document.getElementById('prompt-val').textContent=this.value;renderOps()" class="w-full mt-1">
             </div>
@@ -208,7 +220,7 @@
     <p data-i18n="footer.ops">LLM Perf Model — Per-operation Roofline analysis runs in your browser. Estimates are theoretical upper bounds.</p>
 </footer>
 
-<script src="shared.js?v=16"></script>
+<script src="shared.js?v=17"></script>
 <script>
 // ── Init ──
 populateModelSelect(document.getElementById('model-select'));
