@@ -106,12 +106,21 @@
             <h2 class="text-sm font-semibold flex items-center gap-2">⚙️ <span data-i18n="cfg.runtime">Runtime Configuration</span></h2>
             <div>
                 <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.quant">Quantization</span></label>
-                <select id="quant" onchange="renderOps()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-1.5 text-gray-100 text-sm mt-1 pr-8">
+                <select id="quant" onchange="onQuantChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-1.5 text-gray-100 text-sm mt-1 pr-8">
                     <option value="16">FP16 / BF16</option>
                     <option value="8">INT8 / FP8</option>
                     <option value="4" selected>INT4 / GPTQ / AWQ</option>
                     <option value="3">3-bit (GGUF Q3)</option>
                     <option value="2">2-bit (GGUF Q2)</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="robot.kv.dtype">KV Cache Precision</span></label>
+                <select id="kv-quant" onchange="renderOps()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-1.5 text-gray-100 text-sm mt-1 pr-8">
+                    <option value="16">FP16</option>
+                    <option value="8" selected>INT8 / FP8</option>
+                    <option value="4">INT4</option>
+                    <option value="2">INT2</option>
                 </select>
             </div>
             <div>
@@ -233,6 +242,17 @@ loadConfigFromURL();
 const CAT_COLORS = { attn: '#34d399', ffn: '#38bdf8', norm: '#fbbf24', other: '#6b7280' };
 let opChart = null;
 let currentTab = 'prefill';
+
+function onQuantChange() {
+    const q = parseInt(document.getElementById('quant').value);
+    const kvSel = document.getElementById('kv-quant');
+    if (kvSel) {
+        if (q >= 16) kvSel.value = '16';
+        else if (q >= 8) kvSel.value = '8';
+        else kvSel.value = '8';
+    }
+    renderOps();
+}
 
 function switchTab(tab) {
     currentTab = tab;
