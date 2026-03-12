@@ -135,12 +135,12 @@
                 <label class="text-sm text-gray-400" data-i18n="cfg.net.util">Network BW Utilization (%)</label>
                 <input id="net-util" type="number" min="1" max="100" value="80" onchange="renderOps()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-1.5 text-gray-100 text-sm mt-1">
             </div>
+        </div>
+        <div class="bg-card rounded-xl p-4 border border-gray-800 space-y-3">
             <div>
                 <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.prompt">Prompt Length</span><span id="prompt-val" class="text-primary">512</span></label>
                 <input type="range" id="prompt-len" min="32" max="32768" value="512" step="32" oninput="document.getElementById('prompt-val').textContent=this.value;renderOps()" class="w-full mt-1">
             </div>
-        </div>
-        <div class="bg-card rounded-xl p-4 border border-gray-800 space-y-3">
             <div>
                 <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.output">Output Length</span><span id="output-val" class="text-primary">256</span></label>
                 <input type="range" id="output-len" min="16" max="8192" value="256" step="16" oninput="document.getElementById('output-val').textContent=this.value;renderOps()" class="w-full mt-1">
