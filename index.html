@@ -117,6 +117,7 @@
         <div class="bg-card rounded-xl p-6 border border-gray-800 lg:order-4">
             <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">⚙️ <span data-i18n="cfg.runtime">Runtime Configuration</span></h2>
             <div class="space-y-4">
+                <h3 class="text-sm font-semibold text-gray-300" data-i18n="cfg.quant">Quantization</h3>
                 <div>
                     <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.quant">Quantization</span></label>
                     <select id="quant" onchange="onQuantChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1 pr-8">
@@ -136,6 +137,7 @@
                         <option value="2">INT2</option>
                     </select>
                 </div>
+                <h3 class="text-sm font-semibold text-gray-300" data-i18n="cfg.util">Device Utilization</h3>
                 <div>
                     <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.flops.util">FLOPS Utilization (%)</span></label>
                     <input id="flops-util" type="number" min="1" max="100" value="75" onchange="calculate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1">
