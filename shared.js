@@ -763,7 +763,7 @@ const I18N = {
         // Bot page
         'robot.title': '🤖 AI Bot Sizer',
         'robot.desc': 'Can your device run an LLM chatbot (like OpenClaw) smoothly? Select your model and device to find out.',
-        'robot.scenario': 'Scenario',
+        'robot.scenario': 'Runtime Configuration',
         'robot.control': 'Chat Params',
         'robot.ctx': 'Context Length',
         'robot.resp': 'Response Length',
@@ -929,7 +929,7 @@ const I18N = {
         // Bot 页面
         'robot.title': '🤖 AI Bot 选型',
         'robot.desc': '你的设备能否流畅运行 LLM 聊天机器人（如 OpenClaw）？选择模型和设备，立即评估。',
-        'robot.scenario': '场景',
+        'robot.scenario': '运行时配置',
         'robot.control': '对话参数',
         'robot.ctx': '上下文长度',
         'robot.resp': '回复长度',
