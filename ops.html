@@ -91,17 +91,22 @@
     </div>
 
     <!-- Config Panel (compact) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4 mb-8">
-        <div class="bg-card rounded-xl p-4 border border-gray-800">
-            <label class="text-sm text-gray-400 block mb-1" data-i18n="cfg.model">Model</label>
-            <select id="model-select" onchange="onModelChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8"></select>
-            <div id="model-info" class="text-sm text-gray-500 mt-2 mb-3"></div>
-            <label class="text-sm text-gray-400 block mb-1" data-i18n="cfg.vendor">Vendor</label>
-            <select id="vendor-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8 mb-2"></select>
-            <label class="text-sm text-gray-400 block mb-1" data-i18n="cfg.device">Device</label>
-            <select id="device-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8"></select>
-            <div id="device-info" class="text-sm text-gray-500 mt-2 mb-3"></div>
-            <h3 class="text-sm font-semibold text-gray-300" data-i18n="cfg.util">Device Utilization</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div class="bg-card rounded-xl p-4 border border-gray-800 space-y-3">
+            <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">🧠 <span data-i18n="cfg.model">Model</span></h3>
+            <div>
+                <select id="model-select" onchange="onModelChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8"></select>
+                <div id="model-info" class="text-sm text-gray-500 mt-2"></div>
+            </div>
+            <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2 pt-2 border-t border-gray-800">🖥️ <span data-i18n="cfg.device">Device</span></h3>
+            <div>
+                <label class="text-sm text-gray-400 block mb-1" data-i18n="cfg.vendor">Vendor</label>
+                <select id="vendor-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8 mb-2"></select>
+                <label class="text-sm text-gray-400 block mb-1" data-i18n="cfg.device">Device</label>
+                <select id="device-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm pr-8"></select>
+                <div id="device-info" class="text-sm text-gray-500 mt-2"></div>
+            </div>
+            <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2 pt-2 border-t border-gray-800">📊 <span data-i18n="cfg.util">Device Utilization</span></h3>
             <div>
                 <label class="text-sm text-gray-400" data-i18n="cfg.flops.util">Device FLOPS Utilization (%)</label>
                 <input id="flops-util" type="number" min="1" max="100" value="75" onchange="renderOps()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-1.5 text-gray-100 text-sm mt-1">
@@ -116,8 +121,8 @@
             </div>
         </div>
         <div class="bg-card rounded-xl p-4 border border-gray-800 space-y-3">
-            <h2 class="text-sm font-semibold flex items-center gap-2">⚙️ <span data-i18n="cfg.runtime">Runtime Configuration</span></h2>
-            <h3 class="text-sm font-semibold text-gray-300" data-i18n="cfg.quant">Quantization</h3>
+            <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">⚙️ <span data-i18n="cfg.runtime">Runtime Configuration</span></h3>
+            <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">🧮 <span data-i18n="cfg.quant">Quantization</span></h3>
             <div>
                 <label class="text-sm text-gray-400 flex justify-between"><span data-i18n="cfg.quant">Quantization</span></label>
                 <select id="quant" onchange="onQuantChange()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-1.5 text-gray-100 text-sm mt-1 pr-8">

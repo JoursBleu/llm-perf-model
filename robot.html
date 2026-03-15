@@ -124,28 +124,26 @@
                 </div>
             </div>
         </div>
-        <!-- Model + Device (stacked) -->
-        <div class="space-y-6">
-            <!-- Model Select -->
-            <div class="bg-card rounded-xl p-6 border border-gray-800">
-                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🧠 <span data-i18n="cfg.model">Model</span></h2>
-                <select id="model-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-3 pr-8"></select>
+        <!-- Model + Device -->
+        <div class="bg-card rounded-xl p-6 border border-gray-800">
+            <div class="space-y-4">
+                <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">🧠 <span data-i18n="cfg.model">Model</span></h3>
+                <select id="model-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 pr-8"></select>
                 <div id="model-info" class="text-sm text-gray-500 space-y-1"></div>
-            </div>
-            <!-- Device Select -->
-            <div class="bg-card rounded-xl p-6 border border-gray-800">
-                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">🖥️ <span data-i18n="cfg.device">Device</span></h2>
-                <label class="text-sm text-gray-400 mb-1 block" data-i18n="cfg.vendor">Vendor</label>
-                <select id="vendor-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-3 pr-8"></select>
-                <label class="text-sm text-gray-400 mb-1 block" data-i18n="cfg.device">Device</label>
-                <select id="device-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-3 pr-8"></select>
-                <div id="device-info" class="text-sm text-gray-500 space-y-1"></div>
+                <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2 pt-2 border-t border-gray-800">🖥️ <span data-i18n="cfg.device">Device</span></h3>
+                <div>
+                    <label class="text-sm text-gray-400 mb-1 block" data-i18n="cfg.vendor">Vendor</label>
+                    <select id="vendor-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 mb-2 pr-8"></select>
+                    <label class="text-sm text-gray-400 mb-1 block" data-i18n="cfg.device">Device</label>
+                    <select id="device-select" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2.5 text-gray-100 pr-8"></select>
+                    <div id="device-info" class="text-sm text-gray-500 mt-2 space-y-1"></div>
+                </div>
             </div>
         </div>
-        <!-- Options -->
+        <!-- Quantization & Device Utilization -->
         <div class="bg-card rounded-xl p-6 border border-gray-800">
             <div class="space-y-3">
-                <h3 class="text-sm font-semibold text-gray-300" data-i18n="cfg.quant">Quantization</h3>
+                <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">🧮 <span data-i18n="cfg.quant">Quantization</span></h3>
                 <div>
                     <label class="text-sm text-gray-400" data-i18n="cfg.quant">Quantization</label>
                     <select id="quant" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1 pr-8">
@@ -165,7 +163,7 @@
                         <option value="2">INT2</option>
                     </select>
                 </div>
-                <h3 class="text-sm font-semibold text-gray-300" data-i18n="cfg.util">Device Utilization</h3>
+                <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2 pt-2 border-t border-gray-800">📊 <span data-i18n="cfg.util">Device Utilization</span></h3>
                 <div>
                     <label class="text-sm text-gray-400" data-i18n="cfg.flops.util">Device FLOPS Utilization (%)</label>
                     <input id="flops-util" type="number" min="1" max="100" value="75" onchange="evaluate()" class="w-full bg-surface border border-gray-700 rounded-lg px-3 py-2 text-gray-100 mt-1">
