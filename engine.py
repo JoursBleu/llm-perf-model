@@ -78,6 +78,10 @@ MODELS = {
     "phi-3-medium": ModelConfig("Phi-3 Medium 14B", 14e9, 14e9, 40, 40, 10, 5120, 128, 17920, 32064, 128000, arch="Phi"),
     "phi-4": ModelConfig("Phi-4 14B", 14e9, 14e9, 40, 40, 10, 5120, 128, 17920, 100352, 16384, arch="Phi"),
 
+    # MiniMax
+    "minimax-text-01": ModelConfig("MiniMax-Text-01", 456e9, 45.9e9, 80, 64, 8, 6144, 128, 9216, 200064, 4096000, True, 32, 2, arch="MiniMax", note="Lightning Attention + MoE"),
+    "minimax-m2.1": ModelConfig("MiniMax-M2.1", 229e9, 10.5e9, 62, 48, 8, 3072, 128, 1536, 200064, 196608, True, 256, 8, arch="MiniMax", note="MoE + MTP"),
+
     # Gemma
     "gemma-2-2b": ModelConfig("Gemma 2 2B", 2.6e9, 2.6e9, 26, 8, 4, 2304, 256, 9216, 256000, 8192, arch="Gemma"),
     "gemma-2-9b": ModelConfig("Gemma 2 9B", 9.2e9, 9.2e9, 42, 16, 8, 3584, 256, 14336, 256000, 8192, arch="Gemma"),
