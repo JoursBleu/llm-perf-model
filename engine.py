@@ -36,6 +36,7 @@ class ModelConfig:
     top_k: int = 0
     arch: str = ""
     mla_compressed_dim: Optional[int] = None  # DeepSeek MLA
+    softmax_attn_layers: Optional[int] = None  # None=all softmax; N=only N layers use O(n²) softmax, rest use O(n) linear attn
     note: str = ""
 
 
@@ -79,8 +80,8 @@ MODELS = {
     "phi-4": ModelConfig("Phi-4 14B", 14e9, 14e9, 40, 40, 10, 5120, 128, 17920, 100352, 16384, arch="Phi"),
 
     # MiniMax
-    "minimax-text-01": ModelConfig("MiniMax-Text-01", 456e9, 45.9e9, 80, 64, 8, 6144, 128, 9216, 200064, 4096000, True, 32, 2, arch="MiniMax", note="Lightning Attention + MoE"),
-    "minimax-m2.1": ModelConfig("MiniMax-M2.1", 229e9, 10.5e9, 62, 48, 8, 3072, 128, 1536, 200064, 196608, True, 256, 8, arch="MiniMax", note="MoE + MTP"),
+    "minimax-text-01": ModelConfig("MiniMax-Text-01", 456e9, 45.9e9, 80, 64, 8, 6144, 128, 9216, 200064, 4096000, True, 32, 2, arch="MiniMax", softmax_attn_layers=10, note="Lightning Attention + MoE"),
+    "minimax-m2.1": ModelConfig("MiniMax-M2.1", 229e9, 10.5e9, 62, 48, 8, 3072, 128, 1536, 200064, 196608, True, 256, 8, arch="MiniMax", softmax_attn_layers=0, note="Lightning Attention + MoE + MTP"),
 
     # Gemma
     "gemma-2-2b": ModelConfig("Gemma 2 2B", 2.6e9, 2.6e9, 26, 8, 4, 2304, 256, 9216, 256000, 8192, arch="Gemma"),
@@ -211,34 +212,49 @@ def calc_kv_cache_gb(model: ModelConfig, seq_len: int, batch_size: int, quant_bi
         # layers * compressed_dim * seq_len * 2 bytes (FP16) * batch
         return (model.layers * model.mla_compressed_dim * seq_len * 2 * batch_size) / 1e9
 
-    # Standard GQA KV cache: 2 (K+V) * layers * kv_heads * head_dim * seq_len * bytes
+    # How many layers use standard softmax attention vs linear attention
+    softmax_layers = model.softmax_attn_layers if model.softmax_attn_layers is not None else model.layers
+    linear_layers = model.layers - softmax_layers
+
+    # Standard GQA KV cache: only softmax attention layers need per-token KV storage
     kv_bytes = max(quant_bits, 16) / 8  # KV cache usually FP16 minimum
-    return (2 * model.layers * model.kv_heads * model.head_dim * seq_len * kv_bytes * batch_size) / 1e9
+    kv_cache = (2 * softmax_layers * model.kv_heads * model.head_dim * seq_len * kv_bytes * batch_size) / 1e9
+
+    # Linear attention layers maintain a fixed-size state: heads * head_dim² * 2 bytes per layer
+    linear_state = (linear_layers * model.heads * model.head_dim * model.head_dim * 2 * batch_size) / 1e9
+
+    return kv_cache + linear_state
 
 
 def calc_attention_flops_prefill(model: ModelConfig, seq_len: int, batch_size: int) -> float:
     """
     Attention FLOPs for prefill phase.
-    For each layer: QK^T matmul + softmax + AV matmul
-    QK^T: batch * heads * seq_len * head_dim * seq_len (2x for mul+add)
-    AV:   batch * heads * seq_len * seq_len * head_dim (2x for mul+add)
-    Total per layer = 4 * batch * heads * seq_len^2 * head_dim
+    Softmax attention (standard): O(n²) per layer — 4 * B * H * S² * D
+    Linear attention (Lightning): O(n·d) per layer — 4 * B * H * S * D²
+      (computes K^T@V then Q@state, each O(n*d²) per head)
     """
-    # Use kv_heads for GQA (Q heads are grouped, but compute is over kv_heads groups)
-    # Actually for GQA, each KV head serves (heads/kv_heads) Q heads
-    # Total compute is still proportional to num_heads (Q side)
-    flops_per_layer = 4 * batch_size * model.heads * seq_len * seq_len * model.head_dim
-    return flops_per_layer * model.layers
+    softmax_layers = model.softmax_attn_layers if model.softmax_attn_layers is not None else model.layers
+    linear_layers = model.layers - softmax_layers
+
+    softmax_flops = 4 * batch_size * model.heads * seq_len * seq_len * model.head_dim * softmax_layers
+    linear_flops = 4 * batch_size * model.heads * seq_len * model.head_dim * model.head_dim * linear_layers
+
+    return softmax_flops + linear_flops
 
 
 def calc_attention_flops_decode_step(model: ModelConfig, current_pos: int, batch_size: int) -> float:
     """
-    Attention FLOPs for one decode step at position current_pos.
-    Query is 1 token, attending to current_pos tokens in KV cache.
-    Per layer: 4 * batch * heads * 1 * current_pos * head_dim
+    Attention FLOPs for one decode step.
+    Softmax: O(pos) per layer — 4 * B * H * pos * D (scan full KV cache)
+    Linear:  O(d²) per layer  — 4 * B * H * D² (fixed-size state lookup)
     """
-    flops_per_layer = 4 * batch_size * model.heads * current_pos * model.head_dim
-    return flops_per_layer * model.layers
+    softmax_layers = model.softmax_attn_layers if model.softmax_attn_layers is not None else model.layers
+    linear_layers = model.layers - softmax_layers
+
+    softmax_flops = 4 * batch_size * model.heads * current_pos * model.head_dim * softmax_layers
+    linear_flops = 4 * batch_size * model.heads * model.head_dim * model.head_dim * linear_layers
+
+    return softmax_flops + linear_flops
 
 
 def estimate_performance(

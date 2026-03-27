@@ -48,8 +48,8 @@ const MODELS = {
     'phi-3-medium': { name:'Phi-3 Medium 14B', params:14e9, activeParams:14e9, layers:40, heads:40, kvHeads:10, hiddenDim:5120, headDim:128, interDim:17920, vocabSize:32064, maxCtx:128000, moe:false, arch:'Phi' },
     'phi-4': { name:'Phi-4 14B', params:14e9, activeParams:14e9, layers:40, heads:40, kvHeads:10, hiddenDim:5120, headDim:128, interDim:17920, vocabSize:100352, maxCtx:16384, moe:false, arch:'Phi' },
     // MiniMax
-    'minimax-text-01': { name:'MiniMax-Text-01', params:456e9, activeParams:45.9e9, layers:80, heads:64, kvHeads:8, hiddenDim:6144, headDim:128, interDim:9216, vocabSize:200064, maxCtx:4096000, moe:true, numExperts:32, topK:2, arch:'MiniMax', note:'Lightning Attention + MoE' },
-    'minimax-m2.1': { name:'MiniMax-M2.1', params:229e9, activeParams:10.5e9, layers:62, heads:48, kvHeads:8, hiddenDim:3072, headDim:128, interDim:1536, vocabSize:200064, maxCtx:196608, moe:true, numExperts:256, topK:8, arch:'MiniMax', note:'MoE + MTP' },
+    'minimax-text-01': { name:'MiniMax-Text-01', params:456e9, activeParams:45.9e9, layers:80, heads:64, kvHeads:8, hiddenDim:6144, headDim:128, interDim:9216, vocabSize:200064, maxCtx:4096000, moe:true, numExperts:32, topK:2, arch:'MiniMax', softmaxAttnLayers:10, note:'Lightning Attention + MoE' },
+    'minimax-m2.1': { name:'MiniMax-M2.1', params:229e9, activeParams:10.5e9, layers:62, heads:48, kvHeads:8, hiddenDim:3072, headDim:128, interDim:1536, vocabSize:200064, maxCtx:196608, moe:true, numExperts:256, topK:8, arch:'MiniMax', softmaxAttnLayers:0, note:'Lightning Attention + MoE + MTP' },
     // Gemma
     'gemma-2-2b': { name:'Gemma 2 2B', params:2.6e9, activeParams:2.6e9, layers:26, heads:8, kvHeads:4, hiddenDim:2304, headDim:256, interDim:9216, vocabSize:256000, maxCtx:8192, moe:false, arch:'Gemma' },
     'gemma-2-9b': { name:'Gemma 2 9B', params:9.2e9, activeParams:9.2e9, layers:42, heads:16, kvHeads:8, hiddenDim:3584, headDim:256, interDim:14336, vocabSize:256000, maxCtx:8192, moe:false, arch:'Gemma' },
@@ -154,18 +154,34 @@ function calcKVCacheGB(model, seqLen, batchSize, quantBits, kvQuantBits) {
     if (model.mlaCompressedDim) {
         return (model.layers * model.mlaCompressedDim * seqLen * 2 * batchSize) / 1e9;
     }
+    const softmaxLayers = model.softmaxAttnLayers != null ? model.softmaxAttnLayers : model.layers;
+    const linearLayers = model.layers - softmaxLayers;
     // kvQuantBits: explicit KV cache precision; if omitted, auto from weight quant
     const kvBits = kvQuantBits != null ? kvQuantBits : (quantBits >= 16 ? 16 : 8);
     const bytesPerElem = kvBits / 8;
-    return (2 * model.layers * model.kvHeads * model.headDim * seqLen * bytesPerElem * batchSize) / 1e9;
+    // Standard KV cache only for softmax attention layers
+    const kvCache = (2 * softmaxLayers * model.kvHeads * model.headDim * seqLen * bytesPerElem * batchSize) / 1e9;
+    // Linear attention layers: fixed-size state (heads * headDim² * 2 bytes per layer)
+    const linearState = (linearLayers * model.heads * model.headDim * model.headDim * 2 * batchSize) / 1e9;
+    return kvCache + linearState;
 }
 
 function calcAttentionFlopsPrefill(model, seqLen, batchSize) {
-    return 4 * batchSize * model.heads * seqLen * seqLen * model.headDim * model.layers;
+    const softmaxLayers = model.softmaxAttnLayers != null ? model.softmaxAttnLayers : model.layers;
+    const linearLayers = model.layers - softmaxLayers;
+    // Softmax O(n²): 4*B*H*S²*D per layer; Linear O(n·d): 4*B*H*S*D² per layer
+    const softmaxFlops = 4 * batchSize * model.heads * seqLen * seqLen * model.headDim * softmaxLayers;
+    const linearFlops = 4 * batchSize * model.heads * seqLen * model.headDim * model.headDim * linearLayers;
+    return softmaxFlops + linearFlops;
 }
 
 function calcAttentionFlopsDecodeStep(model, currentPos, batchSize) {
-    return 4 * batchSize * model.heads * currentPos * model.headDim * model.layers;
+    const softmaxLayers = model.softmaxAttnLayers != null ? model.softmaxAttnLayers : model.layers;
+    const linearLayers = model.layers - softmaxLayers;
+    // Softmax: O(pos) per layer; Linear: O(d²) per layer (constant, position-independent)
+    const softmaxFlops = 4 * batchSize * model.heads * currentPos * model.headDim * softmaxLayers;
+    const linearFlops = 4 * batchSize * model.heads * model.headDim * model.headDim * linearLayers;
+    return softmaxFlops + linearFlops;
 }
 
 function fmtFlops(f) {
