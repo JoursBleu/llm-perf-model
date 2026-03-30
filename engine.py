@@ -82,6 +82,7 @@ MODELS = {
     # MiniMax
     "minimax-text-01": ModelConfig("MiniMax-Text-01", 456e9, 45.9e9, 80, 64, 8, 6144, 128, 9216, 200064, 4096000, True, 32, 2, arch="MiniMax", softmax_attn_layers=10, note="Lightning Attention + MoE"),
     "minimax-m2.1": ModelConfig("MiniMax-M2.1", 229e9, 10.5e9, 62, 48, 8, 3072, 128, 1536, 200064, 196608, True, 256, 8, arch="MiniMax", softmax_attn_layers=0, note="Lightning Attention + MoE + MTP"),
+    "minimax-m2.5": ModelConfig("MiniMax-M2.5", 229e9, 10.5e9, 62, 48, 8, 3072, 128, 1536, 200064, 196608, True, 256, 8, arch="MiniMax", softmax_attn_layers=0, note="Lightning Attention + MoE + MTP"),
 
     # Gemma
     "gemma-2-2b": ModelConfig("Gemma 2 2B", 2.6e9, 2.6e9, 26, 8, 4, 2304, 256, 9216, 256000, 8192, arch="Gemma"),
