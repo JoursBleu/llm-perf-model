@@ -6,6 +6,8 @@
 
 ## 功能
 
+- **Qwen3.6 / Edge0 Prefill 分析** — [交互对比页](prefill.html)逐项核算原版 Qwen3.6-35B-A3B K=8 与 Edge0 K=4 的 30 层 GDN、10 层 gated full attention、路由／共享专家、LoRA 和输出层。可调整新 token、缓存前缀、batch、logits 位置数，并导出 JSON。[完整公式与口径](docs/qwen-edge0-prefill.zh.md)。
+
 - **Prefill 延迟估算** — 基于计算密集型分析，估算首 Token 时间 (TTFT)
 - **Decode 吞吐估算** — 基于显存带宽瓶颈分析，估算每秒生成 Token 数
 - **显存用量分析** — 模型权重 + KV Cache + 激活内存的可视化分解
@@ -13,6 +15,8 @@
 - **多设备横向对比** — 所有兼容设备的 Decode 吞吐对比柱状图
 - **量化支持** — FP16、INT8/FP8、INT4 (GPTQ/AWQ)、3-bit、2-bit
 - **张量并行** — 1-8 卡并行的性能缩放估算
+
+该专用 Prefill 分析页无需网络依赖或构建；它提供逻辑计算量，不预测 SSD 流式加载或推理速度。两个模型配置在该对比页提供，没有接入通用硬件估算器下拉框或 Python API。回归检查：`node --test tests/*.test.js`（Node.js 18+）。
 
 ## 支持的模型
 

@@ -6,6 +6,7 @@
 
 ## Features
 
+- **Qwen3.6 / Edge0 Prefill Analysis** — [Interactive comparison](prefill.html) of Qwen3.6-35B-A3B K=8 and the Edge0 K=4 runtime profile: 30 GDN layers, 10 gated full-attention layers, routed/shared experts, LoRA and LM head. Adjust new tokens, cached prefix, batch and logits positions; inspect formulas and export JSON. See the [methodology](docs/qwen-edge0-prefill.md).
 - **Prefill Latency** — Estimates time-to-first-token based on compute-bound analysis
 - **Decode Throughput** — Estimates tokens/sec based on memory-bandwidth-bound analysis  
 - **Memory Breakdown** — Model weights + KV cache + activation memory visualization
@@ -55,6 +56,16 @@ These are theoretical estimates. Real-world performance depends on the inference
 Just open `index.html` in a browser. No build step, no server required.
 
 Or visit the live version: [https://joursbleu.github.io/llm-perf-model/](https://joursbleu.github.io/llm-perf-model/)
+
+## Hybrid prefill analysis and validation
+
+The dedicated `prefill.html` analysis runs without dependencies or a build step. Its hybrid-model FLOP accounting is separate from the generic hardware latency/decode estimator; it does not predict Edge0 SSD streaming performance. These two profiles are available on that comparison page, not in the generic estimator's model selector or Python API.
+
+Run its arithmetic and page-wiring regression checks with Node.js 18 or newer:
+
+```sh
+node --test tests/*.test.js
+```
 
 ## License
 

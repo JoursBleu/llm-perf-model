@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Qwen3.6 &amp; Edge0 Prefill Analysis — LLM Perf Model</title>
+    <meta
+      name="description"
+      content="Compare Qwen3.6-35B-A3B K8 and Edge0 K4 prefill FLOPs: GDN, gated attention, routed and shared experts, LoRA and LM head."
+    />
+    <style>
+      :root {
+        --ink: #1c302e;
+        --muted: #5c6b65;
+        --paper: #f5f3eb;
+        --line: #ccd2c8;
+        --q: #285d51;
+        --e: #c26b38;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "Avenir Next", "PingFang SC", sans-serif;
+        line-height: 1.65;
+      }
+      main {
+        max-width: 1220px;
+        margin: auto;
+        padding: 42px 36px 72px;
+      }
+      header {
+        border-top: 6px solid var(--ink);
+        padding-top: 22px;
+        display: grid;
+        grid-template-columns: 3fr 2fr;
+        gap: 36px;
+        align-items: end;
+      }
+      .site-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 24px;
+        margin-bottom: 28px;
+        font-size: 13px;
+      }
+      .site-nav a[aria-current] {
+        font-weight: 700;
+        color: var(--e);
+      }
+      .eyebrow {
+        font:
+          12px Menlo,
+          monospace;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      h1 {
+        font:
+          clamp(36px, 5vw, 62px) / 1.05 Georgia,
+          serif;
+        letter-spacing: -2px;
+        margin: 18px 0;
+      }
+      h1 em {
+        color: var(--e);
+        font-weight: normal;
+      }
+      h2 {
+        font-size: 20px;
+        margin: 0 0 16px;
+      }
+      p {
+        margin: 8px 0;
+      }
+      header p {
+        font-size: 14px;
+      }
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+        margin: 32px 0 18px;
+        border-block: 1px solid var(--line);
+        padding: 22px 0;
+      }
+      label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      input,
+      select {
+        display: block;
+        width: 100%;
+        margin-top: 7px;
+        padding: 10px 12px;
+        font:
+          15px Menlo,
+          monospace;
+        background: #fffef8;
+        border: 1px solid #a8b7ad;
+        border-radius: 3px;
+        color: var(--ink);
+      }
+      .options {
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+        margin: 0 0 22px;
+      }
+      .options label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .options input {
+        width: auto;
+        margin: 0;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 26px;
+        gap: 30px;
+      }
+      .metric {
+        border-left: 3px solid var(--q);
+        padding-left: 20px;
+      }
+      .metric:nth-child(2) {
+        border-color: var(--e);
+      }
+      .metric:nth-child(3) {
+        border-color: #97a093;
+      }
+      .metric b {
+        display: block;
+        font:
+          36px Georgia,
+          serif;
+        letter-spacing: -1px;
+        margin: 8px 0;
+      }
+      .metric small {
+        display: block;
+        color: var(--muted);
+      }
+      .unit {
+        font:
+          14px Menlo,
+          monospace;
+        margin-left: 7px;
+      }
+      .bars {
+        margin: 28px 0;
+      }
+      .barline {
+        display: grid;
+        grid-template-columns: 80px 1fr;
+        align-items: center;
+        gap: 12px;
+        margin: 10px 0;
+      }
+      .bar {
+        display: flex;
+        height: 24px;
+        max-width: 100%;
+        overflow: hidden;
+      }
+      .bar span {
+        min-width: 0;
+      }
+      .legend {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .legend i {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        margin-right: 5px;
+      }
+      .tablewrap {
+        overflow: auto;
+        border-top: 2px solid var(--ink);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 12px 10px;
+        text-align: right;
+        border-bottom: 1px solid var(--line);
+      }
+      th:first-child,
+      td:first-child {
+        text-align: left;
+      }
+      th:nth-child(2),
+      td:nth-child(2) {
+        text-align: left;
+      }
+      th {
+        background: #e9ece3;
+        font-weight: 600;
+      }
+      td:nth-child(2) {
+        font:
+          11px Menlo,
+          monospace;
+        color: var(--muted);
+      }
+      td:nth-child(n + 3) {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      tfoot {
+        font-weight: 700;
+      }
+      .two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 36px;
+        margin-top: 32px;
+      }
+      .note {
+        padding: 20px;
+        background: #e8ece3;
+        font-size: 13px;
+      }
+      .formula {
+        font:
+          13px/1.9 Menlo,
+          monospace;
+        background: #203e36;
+        color: #edf2e9;
+        padding: 20px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      details {
+        border-top: 1px solid var(--line);
+        margin-top: 28px;
+        padding-top: 18px;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      a {
+        color: var(--q);
+        text-underline-offset: 3px;
+      }
+      footer {
+        margin-top: 28px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      #error {
+        color: #a23a22;
+        font-weight: 600;
+      }
+      button {
+        padding: 8px 14px;
+        border: 1px solid var(--ink);
+        background: transparent;
+        color: var(--ink);
+        cursor: pointer;
+        font: 13px inherit;
+      }
+      button:hover {
+        background: #dfe7dc;
+      }
+      .sub {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      @media (max-width: 760px) {
+        main {
+          padding: 24px 16px;
+        }
+        header,
+        .two {
+          grid-template-columns: 1fr;
+          gap: 15px;
+        }
+        .controls {
+          grid-template-columns: 1fr 1fr;
+        }
+        .metrics {
+          grid-template-columns: 1fr;
+          gap: 18px;
+        }
+        .metric b {
+          font-size: 30px;
+        }
+        h1 {
+          letter-spacing: -1px;
+        }
+        td,
+        th {
+          padding: 9px 7px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav class="site-nav" aria-label="Site navigation">
+        <a href="./">LLM Perf Model</a><a href="ops.html">Per-Op / 逐算子</a
+        ><a href="robot.html">Bot</a
+        ><a href="prefill.html" aria-current="page">Qwen / Edge0 Prefill</a
+        ><a href="https://github.com/puzihao2018/llm-perf-model">GitHub</a>
+      </nav>
+      <header>
+        <div>
+          <div class="eyebrow">Architecture notebook / 09 November 2026</div>
+          <h1>Prefill arithmetic.<br />Qwen <em>×</em> Edge0</h1>
+        </div>
+        <p>
+          原版 Qwen3.6-35B-A3B K=8 与实验配置 Edge0 K=4。<br />逐算子核算 30 层
+          GDN + 10 层 gated full attention + 40 层 MoE。MAC =
+          2；只计算逻辑工作量，不预测运行耗时。
+        </p>
+      </header>
+      <section class="controls" aria-label="Workload inputs">
+        <label
+          >New tokens / 新处理 · T<input
+            id="tokens"
+            type="number"
+            min="1"
+            max="262144"
+            value="2048"
+        /></label>
+        <label
+          >Cached prefix / 缓存前缀 · P<input
+            id="prefix"
+            type="number"
+            min="0"
+            max="262143"
+            value="0"
+        /></label>
+        <label
+          >Equal-length batch · B<input
+            id="batch"
+            type="number"
+            min="1"
+            max="1024"
+            value="1"
+        /></label>
+        <label
+          >LM head positions / 输出位置<select id="head">
+            <option value="last">Last only / 末位置 · M=1</option>
+            <option value="chunks">Chunk ends / 每 2048 tokens</option>
+            <option value="all">All new tokens / 所有新位置 · M=T</option>
+            <option value="none">No logits / 无输出 · M=0</option>
+          </select></label
+        >
+      </section>
+      <div class="options">
+        <label
+          ><input type="checkbox" id="lora" checked />Edge0 未合并 LoRA（实验
+          checkpoint）</label
+        ><span class="sub"
+          >精度不改变这里的矩阵乘加数量；INT4 不能把 FLOPs 除以 4。</span
+        >
+      </div>
+      <p id="error" role="alert"></p>
+      <section class="metrics" aria-live="polite">
+        <div class="metric">
+          Qwen · K=8<b id="qtotal"></b><small id="qtoken"></small>
+        </div>
+        <div class="metric">
+          Edge0 · K=4<b id="etotal"></b><small id="etoken"></small>
+        </div>
+        <div class="metric">
+          FLOPs reduction / 计算减少<b id="saving"></b
+          ><small>逻辑主体 FLOPs 的差值，不是速度提升</small>
+        </div>
+      </section>
+      <section class="bars">
+        <div class="barline">
+          <span>Qwen</span>
+          <div id="qbar" class="bar"></div>
+        </div>
+        <div class="barline">
+          <span>Edge0</span>
+          <div id="ebar" class="bar"></div>
+        </div>
+        <div class="legend" id="legend"></div>
+      </section>
+      <h2>
+        Per-operation totals / 逐算子总量
+        <span class="sub">单位 GFLOPs · 已乘所属层数及 batch</span>
+      </h2>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Operation</th>
+              <th>Formula</th>
+              <th>Qwen</th>
+              <th>Edge0</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+          <tfoot id="totals"></tfoot>
+        </table>
+      </div>
+      <div class="two">
+        <div>
+          <h2>可以直接代入的公式</h2>
+          <div class="formula">
+            Qwen: F = B { 4,985,733,120 T + 81,920 T (2P + T + 1) +
+            1,017,118,720 M } Edge0 (含未合并 LoRA): F = B { 4,021,432,320 T +
+            81,920 T (2P + T + 1) + 1,017,118,720 M } Edge0 (不含 LoRA 矩阵):
+            将线性系数替换为 3,979,100,160。
+          </div>
+        </div>
+        <div class="note">
+          <h2>如何理解这些数字</h2>
+          <p>
+            这里包含所有主要矩阵乘法、depthwise convolution、GDN
+            递推和输出层；非线性、归一化等另外列账。GDN
+            用递推参考算法，不能直接当作任意 chunkwise kernel 的执行指令数。
+          </p>
+          <p>
+            Attention 仅统计因果掩码内的有效 QKᵀ / AV。已有 P 个前缀时，新 token
+            仍须访问前缀。将新 tokens 分块不会重置上下文；有效 pair 数仍为
+            TP+T(T+1)/2。
+          </p>
+          <p>
+            LoRA 来自保留的 Edge0 实验 header 审计：310 个 rank-16
+            targets，42,332,160 FLOPs/token。原版 Qwen 不加这项；此 Edge0
+            prefill 不执行 decode prerouter。
+          </p>
+          <p>
+            <strong>所有结果都是计算，不是测量。</strong>不含视觉编码器或可选
+            MTP；输入若含图像，必须额外核算视觉路径。
+          </p>
+        </div>
+      </div>
+      <details>
+        <summary>
+          展开：归一化、激活、softmax 与门控的近似 scalar-operation 账目
+        </summary>
+        <p class="sub">
+          加减乘除及 exp / log / rsqrt 各计 1
+          次，仅便于列账；它们的硬件成本并不相同。这些数不自动加进上面的主体
+          FLOPs。softmax 的 max 比较、top-k 比较、索引、量化解包、反量化、dtype
+          转换、RoPE 表生成及数据搬运不在该计数内。常量 −exp(A)
+          按一次初始化计入，chunk 分割不重复加算。
+        </p>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Operation</th>
+                <th>Formula</th>
+                <th>Qwen · Gops</th>
+                <th>Edge0 · Gops</th>
+              </tr>
+            </thead>
+            <tbody id="scalar"></tbody>
+            <tfoot id="scalarTotals"></tfoot>
+          </table>
+        </div>
+      </details>
+      <details>
+        <summary>展开：符号、实现口径与来源</summary>
+        <p>
+          H=2048；I=Is=512；E=256；V=248320；L=40；La=10；Lg=30。Attention：nq=16、nkv=2、d=256，Q=nq·d=4096，R=nkv·d=512。GDN：nk=16、nv=32、dk=dv=128，Dk=nk·dk=2048，Dv=nv·dv=4096，卷积宽度
+          c=4。
+        </p>
+        <p>
+          Attention 的 Q+gate 输出宽度为 8192，而不是普通 Q 的 4096。GDN
+          投影、卷积、状态更新与门控都单列，不能用普通 attention 层乘 40 代替。
+        </p>
+        <p>
+          GDN 状态计算：衰减 dk；k·state 为 2dk；delta 两次标量操作；rank-one
+          更新 2dk；q·state 为 2dk。合计每 value head、每 value channel 为
+          7dk+2。
+        </p>
+        <p>
+          GDN chunkwise 实现可能增加块内 Gram 矩阵和三角运算；masked attention
+          也可能执行额外
+          tile。当前公式作为统一的逻辑参考，不是这类实现的精确算子 trace。
+        </p>
+        <p>
+          <a
+            href="https://huggingface.co/Qwen/Qwen3.6-35B-A3B/blob/main/config.json"
+            >Qwen 模型配置</a
+          >
+          ·
+          <a
+            href="https://github.com/Edge0-AI/Edge0/blob/main/docs/models/edge0-35b.md"
+            >Edge0 K=4 运行配置</a
+          >
+          ·
+          <a
+            href="https://github.com/ml-explore/mlx-lm/blob/v0.31.0/mlx_lm/models/qwen3_5.py"
+            >GDN 投影 / 层结构</a
+          >
+          ·
+          <a
+            href="https://github.com/ml-explore/mlx-lm/blob/v0.31.0/mlx_lm/models/qwen3_next.py"
+            >Gated attention / MoE</a
+          >
+          ·
+          <a
+            href="https://github.com/ml-explore/mlx-lm/blob/v0.31.0/mlx_lm/models/gated_delta.py"
+            >GDN recurrence</a
+          >
+        </p>
+      </details>
+      <footer>
+        <p>
+          <a href="docs/qwen-edge0-prefill.md"
+            >English methodology &amp; formulas</a
+          >
+          · <a href="docs/qwen-edge0-prefill.zh.md">中文公式与口径</a>
+        </p>
+        <button id="download">导出当前计算 JSON</button>
+        <p>
+          Logical arithmetic, not measured performance /
+          逻辑算术量，非实测性能。Pure static page · No model execution · No
+          network dependencies.
+        </p>
+      </footer>
+    </main>
+    <script src="prefill-model.js?v=1"></script>
+    <script src="prefill-ui.js?v=1"></script>
+  </body>
+</html>

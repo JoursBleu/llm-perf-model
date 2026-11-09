@@ -779,6 +779,7 @@ const I18N = {
         'mg.chart.ideal': 'Ideal (linear)',
         // Navigation
         'nav.overall': 'Overall',
+        'nav.prefill': 'Prefill analysis',
         'nav.ops': 'Per-Op',
         'nav.robot': 'Bot',
         // Bot page
@@ -945,6 +946,7 @@ const I18N = {
         'mg.chart.ideal': '理想（线性扩展）',
         // 导航
         'nav.overall': '首页',
+        'nav.prefill': 'Prefill 分析',
         'nav.ops': '逐算子',
         'nav.robot': 'Bot 选型',
         // Bot 页面
